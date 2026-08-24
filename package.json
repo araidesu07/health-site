@@ -12,7 +12,6 @@
     "astro": "astro"
   },
   "dependencies": {
-    "@bruits/satteri-win32-x64-msvc": "^0.10.5",
     "astro": "^6.4.8"
   }
 }
