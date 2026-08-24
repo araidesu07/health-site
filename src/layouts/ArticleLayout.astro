@@ -1,0 +1,23 @@
+---
+import '../styles/global.css';
+
+const { frontmatter } = Astro.props;
+---
+
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width" />
+    <title>{frontmatter.title ?? '記事'}</title>
+  </head>
+
+  <body>
+    <main>
+      <h1>{frontmatter.title ?? '記事タイトル'}</h1>
+
+      <p><strong>本記事はプロモーションを含みます。</strong></p>
+
+      <slot />
+    </main>
+  </body>
+</html>
