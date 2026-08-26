@@ -1,6 +1,11 @@
 ---
 layout: ../../layouts/ArticleLayout.astro
 title: "テスト記事"
+description: "ArticleLayoutの表示確認用のテスト記事です。"
+datePublished: "2026-08-24"
+dateModified: "2026-08-24"
+author: "トウノ"
+affiliate: true
 ---
 
 これはMarkdownで作ったテスト記事です。

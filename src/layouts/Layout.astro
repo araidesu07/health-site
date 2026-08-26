@@ -1,23 +1,69 @@
-<!doctype html>
-<html lang="en">
-	<head>
-		<meta charset="utf-8" />
-		<meta name="viewport" content="width=device-width" />
-		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-		<link rel="icon" href="/favicon.ico" />
-		<meta name="generator" content={Astro.generator} />
-		<title>Astro Basics</title>
-	</head>
-	<body>
-		<slot />
-	</body>
-</html>
+---
+/**
+ * サイト共通レイアウト。
+ * 記事ページ・トップページ・固定ページは、すべてこれを使う。
+ *
+ * ここに入っているもの：
+ *   - HTMLの外枠（<html> / <head> / <body>）
+ *   - 共通ヘッダー（サイト名 → トップへのリンク）
+ *   - 共通フッター（固定ページへのリンク、著作権表記）
+ *   - global.css の読み込み
+ *
+ * ページ固有の <head> 要素（記事のJSON-LDなど）は、
+ * 呼び出し側から slot="head" で差し込む。
+ */
+import '../styles/global.css';
+import { SITE_NAME, FOOTER_LINKS } from '../consts';
 
-<style>
-	html,
-	body {
-		margin: 0;
-		width: 100%;
-		height: 100%;
-	}
-</style>
+interface Props {
+  /** <title> と検索結果に出る見出し */
+  title: string;
+  /** meta description。省略可 */
+  description?: string;
+}
+
+const { title, description } = Astro.props;
+
+const canonicalURL = Astro.site
+  ? new URL(Astro.url.pathname, Astro.site).href
+  : undefined;
+
+const year = new Date().getFullYear();
+---
+
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" href="/favicon.ico" />
+
+    <title>{title}</title>
+    {description && <meta name="description" content={description} />}
+    {canonicalURL && <link rel="canonical" href={canonicalURL} />}
+
+    <slot name="head" />
+  </head>
+
+  <body>
+    <header class="site-header">
+      <div class="container">
+        <a class="site-title" href="/">{SITE_NAME}</a>
+      </div>
+    </header>
+
+    <main class="container">
+      <slot />
+    </main>
+
+    <footer class="site-footer">
+      <div class="container">
+        <nav class="footer-nav">
+          {FOOTER_LINKS.map((link) => <a href={link.href}>{link.label}</a>)}
+        </nav>
+        <p class="copyright">© {year} {SITE_NAME}</p>
+      </div>
+    </footer>
+  </body>
+</html>

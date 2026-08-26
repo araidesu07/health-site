@@ -1,12 +1,14 @@
 ## Development
 
-When starting the dev server, use background mode:
+Start the dev server with `npm run dev` (`npm.cmd run dev` on Windows). It runs
+in the foreground on http://localhost:4321/ and stays attached until stopped, so
+run it as a background task rather than blocking on it. Claude Code does this via
+the Bash/PowerShell tool's `run_in_background` option, which reports a task ID and
+a log file path; check progress by reading that log file, and stop the server by
+killing that background task.
 
-```
-astro dev --background
-```
-
-Manage the background server with `astro dev stop`, `astro dev status`, and `astro dev logs`.
+Astro's CLI has no `--background` flag and no `stop`, `status`, or `logs`
+subcommands — backgrounding is the job of whatever runs the command.
 
 ## Documentation
 

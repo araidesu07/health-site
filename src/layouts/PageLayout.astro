@@ -1,0 +1,49 @@
+---
+/**
+ * 固定ページ(.md)用のレイアウト。
+ * 運営者情報・編集ポリシー・プライバシーポリシー・免責事項で使う。
+ *
+ * HTMLの外枠・ヘッダー・フッターは Layout.astro が持っている。
+ * ここは固定ページ固有の要素だけを担当する。
+ *   - ページタイトル(h1)
+ *   - JSON-LD (WebPage)
+ *
+ * 記事ではないので、ArticleLayout と違って
+ * 広告表記・著者名・公開日は出さない。
+ */
+import Layout from './Layout.astro';
+import { SITE_NAME } from '../consts';
+
+const { frontmatter } = Astro.props;
+
+const title = frontmatter.title ?? 'ページ';
+const description = frontmatter.description;
+
+const canonicalURL = Astro.site
+  ? new URL(Astro.url.pathname, Astro.site).href
+  : undefined;
+
+const jsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'WebPage',
+  name: title,
+  ...(description ? { description } : {}),
+  publisher: { '@type': 'Organization', name: SITE_NAME },
+  ...(canonicalURL ? { url: canonicalURL } : {}),
+};
+---
+
+<Layout title={title} description={description}>
+  <script
+    type="application/ld+json"
+    is:inline
+    slot="head"
+    set:html={JSON.stringify(jsonLd).replace(/</g, '\u003c')}
+  />
+
+  <article>
+    <h1>{title}</h1>
+
+    <slot />
+  </article>
+</Layout>
