@@ -1,0 +1,63 @@
+---
+/**
+ * 商品カードを横に並べる器（design-spec-v2.md §4 / §11）
+ *
+ * 本文の最大幅は 720px だが、カード4枚を 720px に押し込むと1枚180pxになり
+ * 画像も製品名も潰れる。そのためこの器だけ本文幅の外に広げている
+ * （margin-left:50% + translateX(-50%) の中央合わせ）。
+ * 画面幅からはみ出さないよう width は calc(100vw - 3rem) で頭打ちにする。
+ *
+ * 列数
+ *   1000px 以上 … 4列
+ *    641〜999px … 2列
+ *    640px 以下 … 1列（縦積み）
+ */
+import ProductCard from './ProductCard.astro';
+import type { Product } from './ProductCard.astro';
+
+interface Props {
+  /** 記事 frontmatter の products。空・未指定なら何も描画しない */
+  items?: Product[];
+}
+
+const { items = [] } = Astro.props;
+
+const hasItems = Array.isArray(items) && items.length > 0;
+---
+
+{hasItems && (
+  <div class="product-grid">
+    {items.map((product) => <ProductCard {...product} />)}
+  </div>
+)}
+
+<style>
+  .product-grid {
+    /* 本文幅（720px）の外へ広げて中央に合わせる */
+    width: min(1080px, calc(100vw - 3rem));
+    margin: 2rem 50% 2.5rem;
+    transform: translateX(-50%);
+
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 1rem;
+    align-items: stretch;
+  }
+
+  @media (max-width: 999px) {
+    .product-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
+  @media (max-width: 640px) {
+    .product-grid {
+      /* スマホでは本文幅に戻し、1列で縦に積む（§11） */
+      width: 100%;
+      margin: 2rem 0 2.5rem;
+      transform: none;
+      grid-template-columns: minmax(0, 1fr);
+      gap: 0.9rem;
+    }
+  }
+</style>

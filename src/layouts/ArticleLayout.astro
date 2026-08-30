@@ -7,8 +7,16 @@
  *   - 広告表記（frontmatter の affiliate: true のときだけ）
  *   - 著者・公開日・更新日
  *   - JSON-LD
+ *   - 結論ボックス（frontmatter の conclusion があるときだけ）
+ *   - タイプ別早見表（frontmatter の typeGuide があるときだけ）
+ *   - 商品カード（frontmatter の products があるときだけ）
  */
 import Layout from './Layout.astro';
+import ConclusionBox from '../components/ConclusionBox.astro';
+import TypeGuide from '../components/TypeGuide.astro';
+import ProductCardGrid from '../components/ProductCardGrid.astro';
+import type { Product } from '../components/ProductCard.astro';
+import type { TypeGuideItem } from '../components/TypeGuide.astro';
 import { SITE_NAME } from '../consts';
 
 const { frontmatter } = Astro.props;
@@ -34,6 +42,13 @@ const title = frontmatter.title ?? '記事';
 const description = frontmatter.description;
 const author = frontmatter.author ?? DEFAULT_AUTHOR;
 const isAffiliate = frontmatter.affiliate === true;
+
+/* design-spec-v2.md §0 の動線に沿って、本文の前に置く構成要素。
+   frontmatter に無い既存記事では undefined になり、何も描画されない。 */
+const conclusion: string[] | undefined = frontmatter.conclusion;
+const typeGuide: TypeGuideItem[] | undefined = frontmatter.typeGuide;
+const typeGuideNote: string | undefined = frontmatter.typeGuideNote;
+const products: Product[] | undefined = frontmatter.products;
 
 const datePublished = toISODate(frontmatter.datePublished);
 const dateModified = toISODate(frontmatter.dateModified) ?? datePublished;
@@ -84,6 +99,12 @@ const jsonLd = {
         </span>
       )}
     </p>
+
+    <ConclusionBox items={conclusion} />
+
+    <TypeGuide items={typeGuide} note={typeGuideNote} />
+
+    <ProductCardGrid items={products} />
 
     <slot />
   </article>

@@ -1,0 +1,230 @@
+---
+/**
+ * タイプ別おすすめ早見表（design-spec-v2.md §3）
+ *
+ * 結論ボックスの直下、商品カードの上に置く。
+ * 読者が10秒で「自分はどの軸で選ぶか」を決められることを狙う。
+ *
+ * ラベルに書くのは「選び方の軸」であって、読者の属性ではない（§3）。
+ *   ○「コスパ最重視」「鉄の量あたりで選びたい」
+ *   ✗「妊娠中の方」「貧血気味の方」
+ * この判断は書き手側の責任で、コンポーネントは検査しない。
+ */
+import { toLargeImage } from './ProductCard.astro';
+
+export interface TypeGuideItem {
+  /** 選び方の軸。読者の属性は書かない */
+  label: string;
+  /** 1行の説明 */
+  description?: string;
+  /** 製品名。2行に収まる長さで書く */
+  name: string;
+  /** 商品画像URL。楽天のサムネイルURLはそのまま渡してよい */
+  image?: string;
+  /** キーとなる数値。カード内で最も大きく出る */
+  figure?: string;
+}
+
+interface Props {
+  /** 記事 frontmatter の typeGuide。空・未指定なら何も描画しない */
+  items?: TypeGuideItem[];
+  /** 表の直下に置く価格の前提（§3）。記事ごとに上書きする */
+  note?: string;
+}
+
+const {
+  items = [],
+  note = '価格は各社公式に掲載された価格をもとに計算した値で、実売価格ではありません。',
+} = Astro.props;
+
+const hasItems = Array.isArray(items) && items.length > 0;
+
+// §3 は3〜4枚を想定。5枚以上渡されても列は4で止め、折り返して並べる
+const columns = Math.min(items.length || 1, 4);
+---
+
+{hasItems && (
+  <div class="type-guide" style={`--type-guide-columns:${columns}`}>
+    <ul class="type-guide-list">
+      {items.map((item, index) => (
+        <li class="type-guide-card" data-tone={index % 4}>
+          <p class="type-guide-label">{item.label}</p>
+
+          {item.description && (
+            <p class="type-guide-description">{item.description}</p>
+          )}
+
+          <div class="type-guide-image">
+            {item.image ? (
+              <img
+                src={toLargeImage(item.image)}
+                alt={item.name}
+                width="300"
+                height="300"
+                loading="lazy"
+                decoding="async"
+              />
+            ) : (
+              <span class="type-guide-image-empty" aria-hidden="true">—</span>
+            )}
+          </div>
+
+          <p class="type-guide-name">{item.name}</p>
+
+          {item.figure && <p class="type-guide-figure">{item.figure}</p>}
+        </li>
+      ))}
+    </ul>
+
+    {note && <p class="type-guide-note">{note}</p>}
+  </div>
+)}
+
+<style>
+  /* 4枚のカードの淡い背景と、ラベルの文字色。
+     緑・青・オレンジは design-spec.md の :root 変数をそのまま使う。
+     紫だけは既存パレットに無いため、ここで1色だけ定義する（彩度は低く）。
+     生の色コードをこのブロックの外に散らさないため、変数にまとめている。 */
+  .type-guide {
+    --tone-0-bg: var(--color-accent-light);
+    --tone-0-label: var(--color-accent);
+    --tone-1-bg: var(--color-primary-light);
+    --tone-1-label: var(--color-primary);
+    --tone-2-bg: #f1eef8;
+    --tone-2-label: #5b4b95;
+    --tone-3-bg: var(--color-warn-light);
+    --tone-3-label: var(--color-warn);
+
+    /* 本文幅（720px）の外へ広げて中央に合わせる。
+       ProductCardGrid と同じ計算にして、左右の端を揃える */
+    width: min(1080px, calc(100vw - 3rem));
+    margin: 2rem 50% 2.5rem;
+    transform: translateX(-50%);
+  }
+
+  .type-guide-list {
+    display: grid;
+    grid-template-columns: repeat(var(--type-guide-columns, 4), minmax(0, 1fr));
+    gap: 1rem;
+    align-items: stretch;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .type-guide-card {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    padding: 1rem 0.9rem;
+    border-radius: 8px;
+    text-align: center;
+  }
+
+  .type-guide-card[data-tone="0"] { background: var(--tone-0-bg); }
+  .type-guide-card[data-tone="1"] { background: var(--tone-1-bg); }
+  .type-guide-card[data-tone="2"] { background: var(--tone-2-bg); }
+  .type-guide-card[data-tone="3"] { background: var(--tone-3-bg); }
+
+  .type-guide-label {
+    margin: 0 0 0.25rem;
+    font-size: 0.925rem;
+    font-weight: 700;
+    line-height: 1.5;
+  }
+
+  .type-guide-card[data-tone="0"] .type-guide-label { color: var(--tone-0-label); }
+  .type-guide-card[data-tone="1"] .type-guide-label { color: var(--tone-1-label); }
+  .type-guide-card[data-tone="2"] .type-guide-label { color: var(--tone-2-label); }
+  .type-guide-card[data-tone="3"] .type-guide-label { color: var(--tone-3-label); }
+
+  .type-guide-description {
+    margin: 0 0 0.8rem;
+    font-size: 0.8rem;
+    line-height: 1.6;
+    color: var(--color-text-muted);
+  }
+
+  .type-guide-image {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 80px;
+    height: 80px;
+    margin: 0 auto 0.7rem;
+    background: var(--color-bg);
+    border-radius: 6px;
+    overflow: hidden;
+  }
+
+  .type-guide-image img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+  }
+
+  .type-guide-image-empty {
+    color: var(--color-text-muted);
+  }
+
+  /* 製品名は2行を想定（§3）。
+     3行以上になっても切り落とさず折り返す。min-height で2行ぶんの高さを
+     確保しているので、名前の長さが違ってもカード内の数値の高さが揃う */
+  .type-guide-name {
+    margin: 0 0 0.5rem;
+    min-height: calc(0.85rem * 1.6 * 2);
+    font-size: 0.85rem;
+    line-height: 1.6;
+    color: var(--color-text);
+  }
+
+  /* キーとなる数値。カード内で最も大きく見せる（§3） */
+  .type-guide-figure {
+    margin: auto 0 0;
+    padding-top: 0.3rem;
+    font-size: 1.25rem;
+    font-weight: 700;
+    line-height: 1.4;
+    color: var(--color-primary-dark);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* 表の直下の価格の前提（§3） */
+  .type-guide-note {
+    margin: 0.9rem 0 0;
+    font-size: 0.8rem;
+    line-height: 1.7;
+    color: var(--color-text-muted);
+  }
+
+  /* スマホ：2列×2段（§11） */
+  @media (max-width: 640px) {
+    .type-guide {
+      width: 100%;
+      margin: 2rem 0 2.5rem;
+      transform: none;
+    }
+
+    .type-guide-list {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 0.7rem;
+    }
+
+    .type-guide-card {
+      padding: 0.85rem 0.7rem;
+    }
+
+    .type-guide-label {
+      font-size: 0.875rem;
+    }
+
+    .type-guide-image {
+      width: 68px;
+      height: 68px;
+    }
+
+    .type-guide-figure {
+      font-size: 1.1rem;
+    }
+  }
+</style>

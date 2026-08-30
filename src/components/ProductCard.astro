@@ -1,0 +1,300 @@
+---
+/**
+ * 商品カード1枚（design-spec-v2.md §4）
+ *
+ * 複数枚を横に並べるのは ProductCardGrid.astro の担当。
+ * このファイルはカード1枚の構造と見た目だけを持つ。
+ *
+ * 構成（上から / §4）
+ *   1. 特徴タグ（ピル型）
+ *   2. 商品画像（正方形 160px）
+ *   3. 製品名
+ *   4. 主要数値（1日目安量あたりの含有量）
+ *   5. おすすめポイント（緑）
+ *   6. 読み・注意点（オレンジ）
+ *   7. CTAボタン（カード下端に固定）
+ *
+ * points / cautions に書いてよいことは §4 のルールに従う。
+ * 吸収・効果・疾病名・対象者は書かない。事実 → その事実の意味、の型で書く。
+ * その判断は書き手側の責任で、このコンポーネントは検査しない。
+ */
+
+export interface Product {
+  /** 特徴タグ。例：「鉄1mgあたり最安」 */
+  tag?: string;
+  /** 製品名。楽天のSEO用長文名ではなく短い正式名称 */
+  name: string;
+  /** 商品画像URL。楽天のサムネイルURLはそのまま渡してよい（下で300x300に直す） */
+  image?: string;
+  /** 主要数値。1日目安量あたりの含有量 */
+  nutrients?: string[];
+  /** おすすめポイント（2〜3項目） */
+  points?: string[];
+  /** 読み・注意点（1〜2項目） */
+  cautions?: string[];
+  /** アフィリエイトリンク。未指定ならCTAを出さない */
+  url?: string;
+}
+
+interface Props extends Product {
+  /** CTAの文言。煽り文言にしないこと（§4） */
+  ctaLabel?: string;
+}
+
+const {
+  tag,
+  name,
+  image,
+  nutrients = [],
+  points = [],
+  cautions = [],
+  url,
+  ctaLabel = '楽天で価格を見る',
+} = Astro.props;
+
+/**
+ * 楽天のサムネイルURLは末尾に `_ex=64x64` のようなサイズ指定が付く。
+ * §4 の指定どおり 300x300 に揃える。
+ * 楽天以外のURL・サイズ指定のないURLはそのまま返す。
+ *
+ * TypeGuide.astro からも同じ変換を使うので export している。
+ */
+export function toLargeImage(src: string | undefined): string | undefined {
+  if (!src) return undefined;
+  return src.replace(/_ex=\d+x\d+/, '_ex=300x300');
+}
+
+const imageSrc = toLargeImage(image);
+---
+
+<article class="product-card">
+  {tag && <p class="product-tag">{tag}</p>}
+
+  <div class="product-head">
+    <div class="product-image">
+      {imageSrc ? (
+        <img
+          src={imageSrc}
+          alt={name}
+          width="300"
+          height="300"
+          loading="lazy"
+          decoding="async"
+        />
+      ) : (
+        <span class="product-image-empty" aria-hidden="true">画像なし</span>
+      )}
+    </div>
+
+    <div class="product-head-text">
+      <h3 class="product-name">{name}</h3>
+
+      {nutrients.length > 0 && (
+        <ul class="product-nutrients">
+          {nutrients.map((line) => <li>{line}</li>)}
+        </ul>
+      )}
+    </div>
+  </div>
+
+  {points.length > 0 && (
+    <div class="product-note product-note-point">
+      <p class="product-note-title">おすすめポイント</p>
+      <ul>{points.map((line) => <li>{line}</li>)}</ul>
+    </div>
+  )}
+
+  {cautions.length > 0 && (
+    <div class="product-note product-note-caution">
+      <p class="product-note-title">読み・注意点</p>
+      <ul>{cautions.map((line) => <li>{line}</li>)}</ul>
+    </div>
+  )}
+
+  {url && (
+    <a
+      class="product-cta"
+      href={url}
+      target="_blank"
+      rel="nofollow sponsored"
+    >
+      {ctaLabel}
+    </a>
+  )}
+</article>
+
+<style>
+  /* 色は design-spec.md の :root 変数だけを使う。生の色コードは書かない */
+  .product-card {
+    display: flex;
+    flex-direction: column;
+    /* グリッドの行内で高さを揃える。CTAは margin-top:auto で下端に固定する */
+    height: 100%;
+    padding: 1rem;
+    background: var(--color-bg);
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+  }
+
+  /* 1. 特徴タグ（ピル型） */
+  .product-tag {
+    align-self: flex-start;
+    margin: 0 0 0.75rem;
+    padding: 0.15em 0.7em;
+    background: var(--color-primary-light);
+    color: var(--color-primary-dark);
+    border-radius: 999px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    line-height: 1.6;
+  }
+
+  /* 2〜4. 画像・製品名・主要数値。スマホでは横並びに切り替える */
+  .product-head {
+    margin-bottom: 0.9rem;
+  }
+
+  .product-image {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 160px;
+    height: 160px;
+    max-width: 100%;
+    margin: 0 auto 0.9rem;
+    background: var(--color-bg-subtle);
+    border-radius: 6px;
+    overflow: hidden;
+  }
+
+  .product-image img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+  }
+
+  .product-image-empty {
+    font-size: 0.8rem;
+    color: var(--color-text-muted);
+  }
+
+  /* 3. 製品名。記事本文の h3（左の緑線）とは別物なので打ち消す */
+  .product-name {
+    margin: 0 0 0.6rem;
+    padding: 0;
+    border: none;
+    font-size: 1rem;
+    font-weight: 700;
+    line-height: 1.6;
+    color: var(--color-text);
+  }
+
+  /* 4. 主要数値 */
+  .product-nutrients {
+    margin: 0;
+    padding: 0.6rem 0 0;
+    border-top: 1px solid var(--color-border);
+    list-style: none;
+    font-size: 0.875rem;
+    line-height: 1.7;
+    color: var(--color-text);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* 5〜6. ポイント／注意点
+     色数を増やさないため、注意点は design-spec.md の警告色（オレンジ）を使う */
+  .product-note {
+    margin-bottom: 0.75rem;
+    padding: 0.7rem 0.8rem;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    line-height: 1.7;
+  }
+
+  .product-note-point {
+    background: var(--color-accent-light);
+  }
+
+  .product-note-caution {
+    background: var(--color-warn-light);
+  }
+
+  .product-note-title {
+    margin: 0 0 0.35rem;
+    font-size: 0.8rem;
+    font-weight: 700;
+  }
+
+  .product-note-point .product-note-title {
+    color: var(--color-accent);
+  }
+
+  .product-note-caution .product-note-title {
+    color: var(--color-warn);
+  }
+
+  .product-note ul {
+    margin: 0;
+    padding-left: 1.1em;
+  }
+
+  .product-note li {
+    margin-bottom: 0.2rem;
+  }
+
+  .product-note li:last-child {
+    margin-bottom: 0;
+  }
+
+  /* 7. CTA。margin-top:auto でカード下端に固定し、カードの高さを揃える。
+     display:block は、カードの外で単体で使われても帯状に出るようにするため */
+  .product-cta {
+    display: block;
+    margin-top: auto;
+    padding: 0.7rem 0.9rem;
+    background: var(--color-primary);
+    color: #ffffff;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    font-weight: 700;
+    line-height: 1.5;
+    text-align: center;
+    text-decoration: none;
+  }
+
+  .product-cta:hover {
+    background: var(--color-primary-dark);
+    color: #ffffff;
+  }
+
+  /* スマホ：画像を左、テキストを右に置いて縦の丈を詰める。
+     画像・製品名・主要数値・CTA が1画面に収まることを優先する（§11） */
+  @media (max-width: 640px) {
+    .product-head {
+      display: flex;
+      gap: 0.9rem;
+      align-items: flex-start;
+    }
+
+    .product-image {
+      flex: none;
+      width: 104px;
+      height: 104px;
+      margin: 0;
+    }
+
+    .product-head-text {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .product-name {
+      font-size: 0.95rem;
+    }
+
+    .product-note {
+      margin-bottom: 0.6rem;
+      padding: 0.6rem 0.7rem;
+    }
+  }
+</style>
