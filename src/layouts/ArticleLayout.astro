@@ -8,15 +8,31 @@
  *   - 著者・公開日・更新日
  *   - JSON-LD
  *   - 結論ボックス（frontmatter の conclusion があるときだけ）
+ *   - カテゴリ検討（frontmatter の categoryDecision があるときだけ）
+ *   - 選び方の軸（frontmatter の decisionAxes があるときだけ）
  *   - タイプ別早見表（frontmatter の typeGuide があるときだけ）
  *   - 商品カード（frontmatter の products があるときだけ）
+ *
+ * 本文より前に置くブロックは、対応する frontmatter キーが無ければ何も描画しない。
+ * したがって既存記事の表示は変わらない。
  */
 import Layout from './Layout.astro';
 import ConclusionBox from '../components/ConclusionBox.astro';
+import CategoryDecision from '../components/CategoryDecision.astro';
+import DecisionAxes from '../components/DecisionAxes.astro';
 import TypeGuide from '../components/TypeGuide.astro';
 import ProductCardGrid from '../components/ProductCardGrid.astro';
+import IssueOneSection from '../components/IssueOneSection.astro';
+import RecommendationSummary from '../components/RecommendationSummary.astro';
+import ProductSection from '../components/ProductSection.astro';
+import TableOfContents from '../components/TableOfContents.astro';
+import SourceList from '../components/SourceList.astro';
 import type { Product } from '../components/ProductCard.astro';
+import type { IssueOneData } from '../components/IssueOneSection.astro';
+import type { Source } from '../components/SourceList.astro';
 import type { TypeGuideItem } from '../components/TypeGuide.astro';
+import type { CategoryDecisionData } from '../components/CategoryDecision.astro';
+import type { DecisionAxisItem } from '../components/DecisionAxes.astro';
 import { SITE_NAME } from '../consts';
 
 const { frontmatter } = Astro.props;
@@ -43,12 +59,35 @@ const description = frontmatter.description;
 const author = frontmatter.author ?? DEFAULT_AUTHOR;
 const isAffiliate = frontmatter.affiliate === true;
 
-/* design-spec-v2.md §0 の動線に沿って、本文の前に置く構成要素。
+/* v2 の記事順序に沿って、本文の前に置く構成要素。
+   結論 → カテゴリ検討 → 選び方の軸 → 候補絞り込み → 主要商品 の順に並べる。
    frontmatter に無い既存記事では undefined になり、何も描画されない。 */
 const conclusion: string[] | undefined = frontmatter.conclusion;
+const categoryDecision: CategoryDecisionData | undefined = frontmatter.categoryDecision;
+const decisionAxes: DecisionAxisItem[] | undefined = frontmatter.decisionAxes;
 const typeGuide: TypeGuideItem[] | undefined = frontmatter.typeGuide;
 const typeGuideNote: string | undefined = frontmatter.typeGuideNote;
 const products: Product[] | undefined = frontmatter.products;
+
+/* --- schema v3 --- */
+// schemaVersion: 3 のときだけ v3 描画。キーが無い既存記事は legacy 描画のまま
+const isV3 = Number(frontmatter.schemaVersion) === 3;
+const issueOne: IssueOneData | undefined = frontmatter.issueOne;
+const sources: Source[] | undefined = frontmatter.sources;
+/* 記事全体の価格条件を補足する注記。出典の直前に1回だけ置く。
+   比較表の直下にも短い注記があるが、あちらはその場で価格差を誤解させないためのもので役割が違う */
+const priceNote: string | undefined =
+  typeof frontmatter.priceNote === 'string' && frontmatter.priceNote.trim() !== ''
+    ? frontmatter.priceNote.trim()
+    : undefined;
+// v3 の conclusion はマップ（issue1）。推薦一覧は products[] から生成する（SSoT）
+const conclusionIssue1: string | undefined =
+  isV3 && conclusion && !Array.isArray(conclusion)
+    ? (conclusion as unknown as { issue1?: string }).issue1
+    : undefined;
+const conclusionRecommendations = isV3 && Array.isArray(products)
+  ? products.map((p) => ({ direction: p.direction, name: p.name, keyPoint: p.keyPoint }))
+  : [];
 
 const datePublished = toISODate(frontmatter.datePublished);
 const dateModified = toISODate(frontmatter.dateModified) ?? datePublished;
@@ -100,12 +139,52 @@ const jsonLd = {
       )}
     </p>
 
-    <ConclusionBox items={conclusion} />
+    {isV3 ? (
+      <>
+        <ConclusionBox
+          issue1={conclusionIssue1}
+          recommendations={conclusionRecommendations}
+        />
 
-    <TypeGuide items={typeGuide} note={typeGuideNote} />
+        <TableOfContents issueOneTitle={issueOne?.title} products={products} />
 
-    <ProductCardGrid items={products} />
+        <IssueOneSection data={issueOne} />
 
-    <slot />
+        <RecommendationSummary items={products} />
+
+        {/* v3 は商品ごとに全幅の独立章。カードグリッドで横並びにしない */}
+        {(products ?? []).map((product, i) => <ProductSection {...product} index={i + 1} />)}
+
+        {priceNote && <p class="article-price-note">{priceNote}</p>}
+
+        <SourceList items={sources} />
+
+        <slot />
+      </>
+    ) : (
+      <>
+        <ConclusionBox items={conclusion} />
+
+        <CategoryDecision data={categoryDecision} />
+
+        <DecisionAxes items={decisionAxes} />
+
+        <TypeGuide items={typeGuide} note={typeGuideNote} />
+
+        <ProductCardGrid items={products} />
+
+        <slot />
+      </>
+    )}
   </article>
 </Layout>
+
+<style>
+  /* 注釈。本文より小さく、控えめな色で置く */
+  .article-price-note {
+    margin: 2.5rem 0 0;
+    font-size: 0.78rem;
+    line-height: 1.7;
+    color: var(--color-text-muted);
+  }
+</style>

@@ -1,0 +1,124 @@
+---
+/**
+ * Issue 1「どんな人がこのカテゴリを検討すべきか」（schema v3 / issueOne）
+ *
+ * article-planner の §9-0 が決めた材料だけを描画する。
+ * 描画順：supplementalFacts → supportingFacts → dataComparison
+ *         → considerationGroups → medicalBoundary
+ *
+ * 値が無い部分は描画しない。カードの羅列にせず、1つのセクションとして読めることを優先する。
+ */
+import DataComparison from './DataComparison.astro';
+import type { DataComparisonData } from './DataComparison.astro';
+
+export interface IssueOneData {
+  title?: string;
+  supplementalFacts?: string[];
+  supportingFacts?: string[];
+  considerationGroups?: string[];
+  medicalBoundary?: string;
+  dataComparison?: DataComparisonData | null;
+}
+
+interface Props {
+  /** 記事 frontmatter の issueOne。空・未指定なら何も描画しない */
+  data?: IssueOneData;
+  /** considerationGroups の前に置く小見出し。記事側で上書きできる */
+  groupsHeading?: string;
+}
+
+const { data, groupsHeading = 'こんな方は意識したい' } = Astro.props;
+
+const clean = (list?: string[]) =>
+  Array.isArray(list) ? list.filter((t) => typeof t === 'string' && t.trim() !== '') : [];
+
+const title = data?.title?.trim();
+const supplementalFacts = clean(data?.supplementalFacts);
+const supportingFacts = clean(data?.supportingFacts);
+const considerationGroups = clean(data?.considerationGroups);
+const medicalBoundary = data?.medicalBoundary?.trim();
+const dataComparison = data?.dataComparison ?? undefined;
+
+const hasContent =
+  supplementalFacts.length > 0 ||
+  supportingFacts.length > 0 ||
+  considerationGroups.length > 0 ||
+  Boolean(medicalBoundary) ||
+  Boolean(dataComparison);
+---
+
+{hasContent && (
+  <section class="issue-one" id="issue-one" aria-label={title ?? 'このカテゴリを検討すべき人'}>
+    {title && <h2 class="issue-one-title">{title}</h2>}
+
+    {supplementalFacts.map((text) => <p class="issue-one-text">{text}</p>)}
+
+    {supportingFacts.map((text) => <p class="issue-one-text">{text}</p>)}
+
+    <DataComparison data={dataComparison} />
+
+    {considerationGroups.length > 0 && (
+      <div class="issue-one-groups">
+        <p class="issue-one-groups-heading">{groupsHeading}</p>
+        <ul>
+          {considerationGroups.map((text) => <li>{text}</li>)}
+        </ul>
+      </div>
+    )}
+
+    {medicalBoundary && <p class="issue-one-boundary">{medicalBoundary}</p>}
+  </section>
+)}
+
+<style>
+  .issue-one {
+    margin: 0 0 2.5rem;
+    scroll-margin-top: 1.5rem;
+  }
+
+  .issue-one-title {
+    margin: 0 0 1rem;
+  }
+
+  .issue-one-text {
+    margin: 0 0 1rem;
+    line-height: 1.9;
+  }
+
+  .issue-one-groups {
+    margin: 1.5rem 0 0;
+    padding: 1.1rem 1.25rem;
+    border-radius: 6px;
+    background: var(--color-bg-subtle);
+  }
+
+  .issue-one-groups-heading {
+    margin: 0 0 0.6rem;
+    font-size: 0.98rem;
+    font-weight: 700;
+    color: var(--color-text);
+  }
+
+  .issue-one-groups ul {
+    margin: 0;
+    padding-left: 1.2rem;
+  }
+
+  .issue-one-groups li {
+    margin: 0 0 0.4rem;
+    line-height: 1.8;
+  }
+
+  .issue-one-groups li:last-child {
+    margin-bottom: 0;
+  }
+
+  .issue-one-boundary {
+    margin: 1.2rem 0 0;
+    padding-left: 0.9rem;
+    border-left: 3px solid var(--color-border);
+    font-size: 0.9rem;
+    line-height: 1.8;
+    color: var(--color-text-muted);
+  }
+</style>

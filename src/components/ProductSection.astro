@@ -1,0 +1,292 @@
+---
+/**
+ * 推薦商品の独立章（schema v3）
+ *
+ * v3 では商品詳細をカードグリッドで横並びにせず、
+ * 1商品＝1つの全幅セクションとして縦に並べる。
+ *
+ *   商品名（h2）
+ *   商品画像（image があるときだけ）
+ *   こんな人におすすめ！   → direction
+ *   この商品の特徴          → overview（商品自体がどんな商品かの説明）
+ *   主要スペック            → supportingFacts（購入判断に重要な客観データ）
+ *   この商品を選んだ理由    → directReason（なぜこの記事で推薦したか）
+ *
+ * 「この商品の特徴」と「この商品を選んだ理由」を混同しない。
+ * 「買う前に知っておきたいこと」は固定ブロックとして持たない。
+ * 購入判断を変える重要事項だけを、writer が最も関係する箇所（主要スペック等）へ統合する。
+ *
+ * 商品ごとの項目数・文章量は揃えない。値の無い項目は描画しない。
+ * productId は内部参照用であり、ここでは一切描画しない。
+ */
+import { toLargeImage } from './ProductCard.astro';
+import type { Product } from './ProductCard.astro';
+
+interface Props extends Product {
+  /** CTAの文言。煽り文言にしないこと */
+  ctaLabel?: string;
+  /** 目次から参照するための通し番号（1始まり） */
+  index?: number;
+}
+
+const {
+  name,
+  image,
+  url,
+  affiliateUrl,
+  affiliateLabel,
+  direction,
+  overview = [],
+  supportingFacts = [],
+  directReason,
+  ctaLabel,
+  trackingPixel,
+  index,
+} = Astro.props;
+
+/**
+ * ASP から提供された画像URLは加工しない（短縮・再生成・サイズ書き換えをしない）。
+ * legacy の記事だけ、従来どおり 300x300 への正規化を通す。
+ */
+const isV3Media = typeof affiliateUrl === 'string' && affiliateUrl.trim() !== '';
+const imageSrc = isV3Media ? image : toLargeImage(image);
+
+const anchorId = typeof index === 'number' ? `product-${index}` : undefined;
+const pixel = typeof trackingPixel === 'string' && trackingPixel.trim() !== ''
+  ? trackingPixel.trim()
+  : undefined;
+
+// 購入導線は affiliateUrl が正。legacy の url しか無い記事のためにフォールバックを残す
+const buyUrl = (affiliateUrl ?? url ?? '').trim() || undefined;
+// 煽らない既定文言。affiliateLabel があればそれを使う
+const buyLabel = (affiliateLabel ?? ctaLabel ?? '').trim() || 'この商品をチェック';
+
+const clean = (list?: string[]) =>
+  Array.isArray(list) ? list.filter((t) => typeof t === 'string' && t.trim() !== '') : [];
+
+const overviewText = clean(overview);
+const specs = clean(supportingFacts);
+const reason = typeof directReason === 'string' ? directReason.trim() : '';
+const forWhom = typeof direction === 'string' ? direction.trim() : '';
+---
+
+<section class="product-section" id={anchorId}>
+  <h2 class="product-section-name">{name}</h2>
+
+  {(imageSrc || buyUrl) && (
+    <div class="product-section-head">
+      {imageSrc && (
+        <div class="product-section-image">
+          {buyUrl ? (
+            <a href={buyUrl} target="_blank" rel="nofollow sponsored noopener">
+              <img src={imageSrc} alt={name} loading="lazy" decoding="async" />
+            </a>
+          ) : (
+            <img src={imageSrc} alt={name} loading="lazy" decoding="async" />
+          )}
+        </div>
+      )}
+
+      {buyUrl && (
+        <p class="product-section-head-cta">
+          <a
+            class="product-section-cta"
+            href={buyUrl}
+            target="_blank"
+            rel="nofollow sponsored noopener"
+          >
+            {buyLabel}
+          </a>
+        </p>
+      )}
+    </div>
+  )}
+
+  {forWhom && (
+    <div class="product-section-block product-section-for">
+      <h3 class="product-section-label">こんな人におすすめ！</h3>
+      <p class="product-section-tag">{forWhom}</p>
+    </div>
+  )}
+
+  {overviewText.length > 0 && (
+    <div class="product-section-block">
+      <h3 class="product-section-label">この商品の特徴</h3>
+      {overviewText.map((line) => <p class="product-section-text">{line}</p>)}
+    </div>
+  )}
+
+  {specs.length > 0 && (
+    <div class="product-section-block">
+      <h3 class="product-section-label">主要スペック</h3>
+      <ul class="product-section-specs">
+        {specs.map((line) => <li>{line}</li>)}
+      </ul>
+    </div>
+  )}
+
+  {reason && (
+    <div class="product-section-block product-section-reason">
+      <h3 class="product-section-label">この商品を選んだ理由</h3>
+      <p class="product-section-text">{reason}</p>
+    </div>
+  )}
+
+  {/* 画像だけが購入導線にならないよう、説明を読んだ直後に必ず明示的なCTAを置く */}
+  {buyUrl && (
+    <p class="product-section-cta-wrap">
+      <a
+        class="product-section-cta"
+        href={buyUrl}
+        target="_blank"
+        rel="nofollow sponsored noopener"
+      >
+        {buyLabel}
+      </a>
+    </p>
+  )}
+
+  {/* ASP の計測用ピクセル。提供コードと同じく 1×1 で出力する */}
+  {pixel && (
+    <img class="product-section-pixel" src={pixel} width="1" height="1" alt="" aria-hidden="true" />
+  )}
+</section>
+
+<style>
+  .product-section {
+    margin: 0 0 3rem;
+  }
+
+  .product-section-name {
+    margin: 0 0 1rem;
+  }
+
+  /* 画像（左）と購入導線（右）。狭い画面では縦積みにする */
+  .product-section-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 1rem 1.25rem;
+    margin: 0 0 1.5rem;
+  }
+
+  .product-section-image {
+    flex: none;
+  }
+
+  /* ASP の 128x128 素材を、それ以上に引き伸ばさない */
+  .product-section-image img {
+    display: block;
+    width: auto;
+    max-width: min(128px, 100%);
+    height: auto;
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+    background: var(--color-bg);
+  }
+
+  .product-section-head-cta {
+    margin: 0;
+  }
+
+  .product-section-block {
+    margin: 0 0 1.35rem;
+  }
+
+  .product-section-block:last-of-type {
+    margin-bottom: 0;
+  }
+
+  .product-section-label {
+    margin: 0 0 0.4rem;
+    font-size: 0.98rem;
+    font-weight: 700;
+    line-height: 1.6;
+    color: var(--color-primary-dark);
+  }
+
+  .product-section-text {
+    margin: 0 0 0.6rem;
+    line-height: 1.9;
+  }
+
+  .product-section-text:last-child {
+    margin-bottom: 0;
+  }
+
+  .product-section-tag {
+    display: inline-block;
+    margin: 0;
+    padding: 0.28rem 0.8rem;
+    border-radius: 999px;
+    background: var(--color-primary-light);
+    font-size: 0.95rem;
+    line-height: 1.6;
+  }
+
+  /* 主要スペックは拾い読みできるように、余白を詰めた定義的な見せ方にする */
+  .product-section-specs {
+    margin: 0;
+    padding: 0.9rem 1.1rem;
+    border-radius: 6px;
+    background: var(--color-bg-subtle);
+    list-style: none;
+  }
+
+  .product-section-specs li {
+    margin: 0 0 0.4rem;
+    padding-left: 1rem;
+    position: relative;
+    font-size: 0.95rem;
+    line-height: 1.8;
+  }
+
+  .product-section-specs li:last-child {
+    margin-bottom: 0;
+  }
+
+  .product-section-specs li::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0.75em;
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: var(--color-primary);
+  }
+
+  .product-section-reason .product-section-label {
+    color: var(--color-accent);
+  }
+
+  .product-section-cta-wrap {
+    margin: 1.5rem 0 0;
+  }
+
+  .product-section-cta {
+    display: inline-block;
+    padding: 0.7rem 1.6rem;
+    border-radius: 6px;
+    background: var(--color-primary);
+    color: #ffffff;
+    font-weight: 700;
+    text-decoration: none;
+  }
+
+  .product-section-cta:hover {
+    background: var(--color-primary-dark);
+  }
+
+  .product-section-pixel {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    border: 0;
+  }
+
+  /* アンカーで飛んだとき見出しが上端に貼り付かないようにする */
+  .product-section {
+    scroll-margin-top: 1.5rem;
+  }
+</style>

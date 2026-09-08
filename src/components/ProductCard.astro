@@ -34,6 +34,28 @@ export interface Product {
   cautions?: string[];
   /** アフィリエイトリンク。未指定ならCTAを出さない */
   url?: string;
+
+  /* --- schema v3 のフィールド（legacy 記事には無い） --- */
+  /** v3：推薦方向（こんな人向け） */
+  direction?: string;
+  /** v3：内部参照用の productId。読者には絶対に表示しない */
+  productId?: string;
+  /** v3：簡易比較に出す短い決め手 */
+  keyPoint?: string;
+  /** v3：決め手（1文） */
+  directReason?: string;
+  /** v3：アフィリエイトリンク。運営者が付与する。未指定ならCTAを出さない */
+  affiliateUrl?: string;
+  /** v3：CTAの文言。未指定なら既定文言を使う */
+  affiliateLabel?: string;
+  /** v3：ASPの計測用ピクセル画像URL。1×1で不可視に近い形で出力する */
+  trackingPixel?: string;
+  /** v3：この商品の特徴。商品自体がどんな商品かの説明（2〜3文） */
+  overview?: string[];
+  /** v3：主要スペック（購入判断に重要な客観データ） */
+  supportingFacts?: string[];
+  /** v3：購入前に判断へ影響する注意 */
+  buyBeforeNotes?: string[];
 }
 
 interface Props extends Product {
@@ -50,7 +72,26 @@ const {
   cautions = [],
   url,
   ctaLabel = '楽天で価格を見る',
+  direction,
+  keyPoint,
+  directReason,
+  supportingFacts = [],
+  buyBeforeNotes = [],
 } = Astro.props;
+
+/**
+ * v3 かどうかは directReason の有無で判定する。
+ * legacy 記事は directReason を持たないため、表示は一切変わらない。
+ * （productId は内部参照用。ここでは読み取らず、描画もしない）
+ */
+const isV3 = typeof directReason === 'string' && directReason.trim() !== '';
+
+const tagText = isV3 ? (direction ?? tag) : tag;
+const numberLines = isV3 && supportingFacts.length > 0 ? supportingFacts : nutrients;
+const pointTitle = isV3 ? '決め手' : 'おすすめポイント';
+const pointLines = isV3 ? [directReason as string] : points;
+const cautionTitle = isV3 ? '買う前に' : '読み・注意点';
+const cautionLines = isV3 ? buyBeforeNotes : cautions;
 
 /**
  * 楽天のサムネイルURLは末尾に `_ex=64x64` のようなサイズ指定が付く。
@@ -68,7 +109,7 @@ const imageSrc = toLargeImage(image);
 ---
 
 <article class="product-card">
-  {tag && <p class="product-tag">{tag}</p>}
+  {tagText && <p class="product-tag">{tagText}</p>}
 
   <div class="product-head">
     <div class="product-image">
@@ -89,25 +130,25 @@ const imageSrc = toLargeImage(image);
     <div class="product-head-text">
       <h3 class="product-name">{name}</h3>
 
-      {nutrients.length > 0 && (
+      {numberLines.length > 0 && (
         <ul class="product-nutrients">
-          {nutrients.map((line) => <li>{line}</li>)}
+          {numberLines.map((line) => <li>{line}</li>)}
         </ul>
       )}
     </div>
   </div>
 
-  {points.length > 0 && (
+  {pointLines.length > 0 && (
     <div class="product-note product-note-point">
-      <p class="product-note-title">おすすめポイント</p>
-      <ul>{points.map((line) => <li>{line}</li>)}</ul>
+      <p class="product-note-title">{pointTitle}</p>
+      <ul>{pointLines.map((line) => <li>{line}</li>)}</ul>
     </div>
   )}
 
-  {cautions.length > 0 && (
+  {cautionLines.length > 0 && (
     <div class="product-note product-note-caution">
-      <p class="product-note-title">読み・注意点</p>
-      <ul>{cautions.map((line) => <li>{line}</li>)}</ul>
+      <p class="product-note-title">{cautionTitle}</p>
+      <ul>{cautionLines.map((line) => <li>{line}</li>)}</ul>
     </div>
   )}
 

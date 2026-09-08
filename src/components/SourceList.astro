@@ -1,0 +1,92 @@
+---
+/**
+ * 出典（schema v3 / sources[]）
+ *
+ * 記事末尾に置く。label をリンクにして、生URLを大きく見せない。
+ * 目立たせすぎないが、確認できる状態にする。
+ */
+
+export interface Source {
+  label: string;
+  url?: string;
+  checkedAt?: string;
+}
+
+interface Props {
+  /** 記事 frontmatter の sources。空・未指定なら何も描画しない */
+  items?: Source[];
+  /** 見出し文言。通常は変えない */
+  heading?: string;
+}
+
+const { items = [], heading = '出典' } = Astro.props;
+
+const sources = Array.isArray(items)
+  ? items.filter((s) => s && typeof s.label === 'string' && s.label.trim() !== '')
+  : [];
+
+const hasSources = sources.length > 0;
+
+/** "2026-09-07" → "2026年9月7日" */
+function formatJa(value?: string): string | undefined {
+  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return value || undefined;
+  const [year, month, day] = value.split('-').map(Number);
+  return `${year}年${month}月${day}日`;
+}
+---
+
+{hasSources && (
+  <section class="source-list" aria-label={heading}>
+    <h2 class="source-list-heading">{heading}</h2>
+    <ul>
+      {sources.map((source) => (
+        <li>
+          {source.url ? (
+            <a href={source.url} target="_blank" rel="noopener">{source.label}</a>
+          ) : (
+            <span>{source.label}</span>
+          )}
+          {source.checkedAt && (
+            <span class="source-list-date">（{formatJa(source.checkedAt)}確認）</span>
+          )}
+        </li>
+      ))}
+    </ul>
+  </section>
+)}
+
+<style>
+  .source-list {
+    margin: 2.5rem 0 0;
+    padding-top: 1.25rem;
+    border-top: 1px solid var(--color-border);
+  }
+
+  .source-list-heading {
+    margin: 0 0 0.75rem;
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--color-text);
+  }
+
+  .source-list ul {
+    margin: 0;
+    padding-left: 1.2rem;
+  }
+
+  .source-list li {
+    margin: 0 0 0.45rem;
+    font-size: 0.88rem;
+    line-height: 1.75;
+    color: var(--color-text-muted);
+    overflow-wrap: anywhere;
+  }
+
+  .source-list li:last-child {
+    margin-bottom: 0;
+  }
+
+  .source-list-date {
+    margin-left: 0.15rem;
+  }
+</style>

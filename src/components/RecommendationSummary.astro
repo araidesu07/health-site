@@ -1,0 +1,273 @@
+---
+/**
+ * おすすめ商品のざっくり比較（schema v3）
+ *
+ * 専用の frontmatter キーは持たない。products[] から生成する（SSoT は products[]）。
+ * 出すのは 商品画像／商品名／こんな人向け／ざっくり特徴 だけ。
+ * 詳細スペック・注意事項はここに置かない（商品ごとの独立章が担当する）。
+ *
+ * PC は比較表形式。狭い画面では横スクロールさせず、
+ * 1商品＝1ブロックとして画像＋情報が縦に並ぶ形へ切り替える。
+ */
+import { toLargeImage } from './ProductCard.astro';
+import type { Product } from './ProductCard.astro';
+
+interface Props {
+  /** 記事 frontmatter の products。空・未指定なら何も描画しない */
+  items?: Product[];
+  /** 見出し文言。通常は変えない */
+  heading?: string;
+  /**
+   * 表の直下に1回だけ置く注記。その場で価格差を誤解させないための短いもの。
+   * 記事の価格比較はメーカー公式価格が基準で、リンク先の販売価格とは別データであることを示す。
+   * 商品ごとに繰り返さない。記事全体の価格条件は記事末尾の注記が受け持つ。
+   */
+  note?: string;
+}
+
+const {
+  items = [],
+  heading = 'おすすめ商品をざっくり比較',
+  note = '※価格は2026年9月時点の各メーカー公式サイトの通常価格を基準にしています。通販価格は販売店・時期などにより異なります。',
+} = Astro.props;
+
+const rows = Array.isArray(items)
+  ? items.filter((p) => p && typeof p.name === 'string' && p.name.trim() !== '')
+  : [];
+
+const hasRows = rows.length > 0;
+
+// 1件でも画像があれば画像列を出す。1件も無ければ画像領域そのものを作らない
+// ASP 提供の画像URLは加工しない。legacy（affiliateUrl なし）だけ従来の正規化を通す
+const imageOf = (p: Product) =>
+  (typeof p.affiliateUrl === "string" && p.affiliateUrl.trim() !== "" ? p.image : toLargeImage(p.image));
+const hasAnyImage = rows.some((p) => Boolean(imageOf(p)));
+// 1件でも購入リンクがあればCTA列を出す。1件も無ければ列そのものを作らない
+const buyUrlOf = (p: Product) => ((p.affiliateUrl ?? p.url ?? '').trim() || undefined);
+const buyLabelOf = (p: Product) => ((p.affiliateLabel ?? '').trim() || 'この商品をチェック');
+const hasAnyCta = rows.some((p) => Boolean(buyUrlOf(p)));
+---
+
+{hasRows && (
+  <section class="rec-summary" id="recommendations" aria-label={heading}>
+    <h2 class="rec-summary-heading">{heading}</h2>
+
+    <ul
+      class="rec-summary-list"
+      data-with-image={hasAnyImage ? 'true' : 'false'}
+      data-with-cta={hasAnyCta ? 'true' : 'false'}
+    >
+      {rows.map((item) => {
+        const src = imageOf(item);
+        const href = buyUrlOf(item);
+        return (
+          <li class="rec-summary-row">
+            {hasAnyImage && (
+              <span class="rec-summary-cell rec-summary-image">
+                {src && (href ? (
+                  <a href={href} target="_blank" rel="nofollow sponsored noopener">
+                    <img src={src} alt={item.name} loading="lazy" decoding="async" />
+                  </a>
+                ) : (
+                  <img src={src} alt={item.name} loading="lazy" decoding="async" />
+                ))}
+              </span>
+            )}
+
+            <span class="rec-summary-cell rec-summary-name">
+              <span class="rec-summary-label">商品</span>
+              <span class="rec-summary-value">{item.name}</span>
+            </span>
+
+            <span class="rec-summary-cell rec-summary-direction">
+              <span class="rec-summary-label">こんな人向け</span>
+              <span class="rec-summary-value">{item.direction ?? item.tag}</span>
+            </span>
+
+            <span class="rec-summary-cell rec-summary-key">
+              <span class="rec-summary-label">ざっくり特徴</span>
+              <span class="rec-summary-value">{item.keyPoint}</span>
+            </span>
+
+            {hasAnyCta && (
+              <span class="rec-summary-cell rec-summary-cta-cell">
+                {buyUrlOf(item) && (
+                  <a
+                    class="rec-summary-cta"
+                    href={buyUrlOf(item)}
+                    target="_blank"
+                    rel="nofollow sponsored noopener"
+                  >
+                    {buyLabelOf(item)}
+                  </a>
+                )}
+              </span>
+            )}
+          </li>
+        );
+      })}
+    </ul>
+
+    {/* CTA を出すときだけ、価格の基準が別データであることを1回だけ添える */}
+    {hasAnyCta && note && <p class="rec-summary-note">{note}</p>}
+  </section>
+)}
+
+<style>
+  .rec-summary {
+    margin: 0 0 2.5rem;
+  }
+
+  .rec-summary-heading {
+    margin: 0 0 1rem;
+  }
+
+  .rec-summary-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+    overflow: hidden;
+  }
+
+  /* PC：比較表形式（画像 / 商品 / こんな人向け / ざっくり特徴） */
+  .rec-summary-row {
+    display: grid;
+    grid-template-columns: minmax(0, 2.2fr) minmax(0, 1fr) minmax(0, 1.05fr);
+    gap: 0 1rem;
+    align-items: center;
+    padding: 0.9rem 1.1rem;
+  }
+
+  .rec-summary-list[data-with-image='true'] .rec-summary-row {
+    grid-template-columns: 96px minmax(0, 2.2fr) minmax(0, 1fr) minmax(0, 1.05fr);
+  }
+
+  .rec-summary-list[data-with-cta='true'] .rec-summary-row {
+    grid-template-columns: minmax(0, 2.2fr) minmax(0, 1fr) minmax(0, 1.05fr) 8.5em;
+  }
+
+  .rec-summary-list[data-with-image='true'][data-with-cta='true'] .rec-summary-row {
+    grid-template-columns: 96px minmax(0, 2.2fr) minmax(0, 1fr) minmax(0, 1.05fr) 8.5em;
+  }
+
+  .rec-summary-cta {
+    display: inline-block;
+    width: 100%;
+    padding: 0.5rem 0.6rem;
+    border-radius: 5px;
+    background: var(--color-primary);
+    color: #ffffff;
+    font-size: 0.85rem;
+    font-weight: 700;
+    line-height: 1.4;
+    text-align: center;
+    text-decoration: none;
+  }
+
+  .rec-summary-cta:hover {
+    background: var(--color-primary-dark);
+  }
+
+  .rec-summary-row + .rec-summary-row {
+    border-top: 1px solid var(--color-border);
+  }
+
+  .rec-summary-row:nth-child(odd) {
+    background: var(--color-bg-subtle);
+  }
+
+  .rec-summary-cell {
+    display: block;
+    min-width: 0;
+  }
+
+  /* ASP の元画像より大きく引き伸ばさない（max-width で上限だけ決める） */
+  .rec-summary-image img {
+    display: block;
+    width: auto;
+    max-width: 100%;
+    height: auto;
+    border-radius: 4px;
+    background: var(--color-bg);
+  }
+
+  .rec-summary {
+    scroll-margin-top: 1.5rem;
+  }
+
+  .rec-summary-note {
+    margin: 0.7rem 0 0;
+    font-size: 0.78rem;
+    line-height: 1.7;
+    color: var(--color-text-muted);
+  }
+
+  /* 広い画面では列見出しの繰り返しが冗長なので隠す */
+  .rec-summary-label {
+    display: none;
+    font-size: 0.72rem;
+    color: var(--color-text-muted);
+  }
+
+  .rec-summary-value {
+    display: block;
+    line-height: 1.7;
+    /* 1〜2文字での細切れ改行を避ける。break-all 相当は使わない */
+    overflow-wrap: break-word;
+    word-break: normal;
+  }
+
+  .rec-summary-name .rec-summary-value {
+    font-weight: 700;
+  }
+
+  .rec-summary-direction .rec-summary-value,
+  .rec-summary-key .rec-summary-value {
+    font-size: 0.92rem;
+    color: var(--color-text-muted);
+  }
+
+  /* 狭い画面：横スクロールさせず、1商品＝1ブロックとして縦に積む */
+  @media (max-width: 680px) {
+    .rec-summary-row,
+    .rec-summary-list[data-with-image='true'] .rec-summary-row,
+    .rec-summary-list[data-with-cta='true'] .rec-summary-row,
+    .rec-summary-list[data-with-image='true'][data-with-cta='true'] .rec-summary-row {
+      grid-template-columns: 72px 1fr;
+      gap: 0.35rem 0.85rem;
+      align-items: start;
+      padding: 1rem 1.1rem;
+    }
+
+    /* 画像は左に置き、テキストは右側に縦積みする */
+    .rec-summary-image {
+      grid-row: 1 / span 3;
+    }
+
+    .rec-summary-list[data-with-image='false'] .rec-summary-row,
+    .rec-summary-list[data-with-image='false'][data-with-cta='true'] .rec-summary-row {
+      grid-template-columns: 1fr;
+    }
+
+    /* CTAは行の最後に全幅で置く */
+    .rec-summary-cta-cell {
+      grid-column: 1 / -1;
+      margin-top: 0.35rem;
+    }
+
+    .rec-summary-label {
+      display: block;
+      margin-bottom: 0.05rem;
+    }
+
+    .rec-summary-name .rec-summary-label {
+      display: none;
+    }
+
+    .rec-summary-name .rec-summary-value {
+      font-size: 1.02rem;
+    }
+  }
+</style>

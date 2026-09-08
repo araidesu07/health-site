@@ -1,0 +1,106 @@
+---
+/**
+ * 目次（schema v3）
+ *
+ * frontmatter に toc 専用の配列は持たない。既存の SSoT から生成する。
+ *   issueOne.title            → #issue-one
+ *   「おすすめ商品をざっくり比較」 → #recommendations
+ *   products[].name           → #product-1 / #product-2 / ...
+ *
+ * productId はアンカーにも本文にも露出させない。
+ * 結論より目立たせない。固定追従にしない。
+ */
+import type { Product } from './ProductCard.astro';
+
+interface Props {
+  /** Issue 1 セクションの見出し（issueOne.title） */
+  issueOneTitle?: string;
+  /** 記事 frontmatter の products */
+  products?: Product[];
+  /** ざっくり比較の見出し。RecommendationSummary と揃える */
+  summaryHeading?: string;
+  /** 見出し文言。通常は変えない */
+  heading?: string;
+}
+
+const {
+  issueOneTitle,
+  products = [],
+  summaryHeading = 'おすすめ商品をざっくり比較',
+  heading = '目次',
+} = Astro.props;
+
+const productItems = Array.isArray(products)
+  ? products.filter((p) => p && typeof p.name === 'string' && p.name.trim() !== '')
+  : [];
+
+const items: { href: string; label: string }[] = [];
+
+if (typeof issueOneTitle === 'string' && issueOneTitle.trim() !== '') {
+  items.push({ href: '#issue-one', label: issueOneTitle.trim() });
+}
+
+if (productItems.length > 0) {
+  items.push({ href: '#recommendations', label: summaryHeading });
+  productItems.forEach((product, i) => {
+    items.push({ href: `#product-${i + 1}`, label: product.name });
+  });
+}
+
+const hasItems = items.length > 0;
+---
+
+{hasItems && (
+  <nav class="toc" aria-label={heading}>
+    <p class="toc-heading">{heading}</p>
+    <ol class="toc-list">
+      {items.map((item) => (
+        <li>
+          <a href={item.href}>{item.label}</a>
+        </li>
+      ))}
+    </ol>
+  </nav>
+)}
+
+<style>
+  /* 結論ボックスより目立たせない。控えめな枠だけを持たせる */
+  .toc {
+    margin: 0 0 2.5rem;
+    padding: 1.1rem 1.35rem;
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+    background: var(--color-bg);
+  }
+
+  .toc-heading {
+    margin: 0 0 0.6rem;
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: var(--color-text-muted);
+  }
+
+  .toc-list {
+    margin: 0;
+    padding-left: 1.4rem;
+  }
+
+  .toc-list li {
+    margin: 0 0 0.4rem;
+    line-height: 1.7;
+  }
+
+  .toc-list li:last-child {
+    margin-bottom: 0;
+  }
+
+  .toc-list a {
+    color: var(--color-primary);
+    text-decoration: none;
+    overflow-wrap: anywhere;
+  }
+
+  .toc-list a:hover {
+    text-decoration: underline;
+  }
+</style>

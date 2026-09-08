@@ -356,6 +356,7 @@ a:hover {
   padding: 0.7rem 1rem;
   margin: 0 0 1.5rem;
   font-size: 1rem; /* 本文と同じ。仕様9の禁止事項に合わせ、本文より小さくしない */
+  font-weight: 700; /* CLAUDE.md §1：広告表記は太字 */
   color: var(--color-text);
 }
 

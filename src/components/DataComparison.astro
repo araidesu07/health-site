@@ -1,0 +1,330 @@
+---
+/**
+ * 基準値と実態値の比較（schema v3 / issueOne.dataComparison）
+ *
+ * 汎用コンポーネント。特定カテゴリ向けの分岐は持たない。
+ *   actual      → 横棒（実態値）
+ *   references  → 基準位置のマーカー（縦線）
+ *
+ * 「値の差・位置関係が、数字を読まなくても理解できる」ことを最優先にする。
+ * データは planner が決めた comparisonEvidence 由来。ここでは計算・丸めをしない。
+ */
+
+export interface DataComparisonReference {
+  label: string;
+  value: number;
+}
+
+export interface DataComparisonRow {
+  label: string;
+  actual: number;
+  references?: DataComparisonReference[];
+}
+
+export interface DataComparisonGroup {
+  label?: string;
+  note?: string;
+  rows: DataComparisonRow[];
+}
+
+export interface DataComparisonData {
+  title?: string;
+  lead?: string;
+  unit?: string;
+  scaleMax?: number;
+  actualLabel?: string;
+  groups?: DataComparisonGroup[];
+  note?: string;
+  sourceRefs?: string[];
+}
+
+interface Props {
+  /** 記事 frontmatter の issueOne.dataComparison。空・未指定なら何も描画しない */
+  data?: DataComparisonData;
+}
+
+const { data } = Astro.props;
+
+const groups = Array.isArray(data?.groups)
+  ? data.groups.filter((g) => g && Array.isArray(g.rows) && g.rows.length > 0)
+  : [];
+
+const hasData = Boolean(data) && groups.length > 0;
+
+const actualLabel = data?.actualLabel?.trim() || '実測値';
+
+/** グラフ上に現れるすべての値（スケール算出用） */
+const allValues: number[] = [];
+for (const g of groups) {
+  for (const r of g.rows) {
+    if (typeof r.actual === 'number') allValues.push(r.actual);
+    for (const ref of r.references ?? []) {
+      if (typeof ref.value === 'number') allValues.push(ref.value);
+    }
+  }
+}
+
+// 同一グラフ内は同一スケール。scaleMax の指定が無ければ最大値に少し余裕を持たせる
+const maxValue = allValues.length > 0 ? Math.max(...allValues) : 1;
+const scaleMax =
+  typeof data?.scaleMax === 'number' && data.scaleMax >= maxValue
+    ? data.scaleMax
+    : maxValue * 1.08;
+
+const pct = (v: number) => {
+  if (typeof v !== 'number' || !Number.isFinite(v) || scaleMax <= 0) return 0;
+  return Math.max(0, Math.min(100, (v / scaleMax) * 100));
+};
+
+/** グループ内に出てくる基準値のラベルを、出現順に重複なく集める（凡例と色の対応に使う） */
+const refLabelsOf = (group: DataComparisonGroup): string[] => {
+  const seen: string[] = [];
+  for (const row of group.rows) {
+    for (const ref of row.references ?? []) {
+      const label = ref?.label?.trim();
+      if (label && !seen.includes(label)) seen.push(label);
+    }
+  }
+  return seen;
+};
+---
+
+{hasData && (
+  <figure class="dc">
+    {data?.title && <figcaption class="dc-title">{data.title}</figcaption>}
+    {data?.lead && <p class="dc-lead">{data.lead}</p>}
+
+    {groups.map((group) => {
+      const refLabels = refLabelsOf(group);
+      return (
+        <div class="dc-group">
+          {group.label && <p class="dc-group-label">{group.label}</p>}
+
+          <ul class="dc-legend">
+            <li>
+              <span class="dc-key dc-key-bar" aria-hidden="true"></span>
+              {actualLabel}
+            </li>
+            {refLabels.map((label, i) => (
+              <li>
+                <span class="dc-key dc-key-ref" data-ref={i % 3} aria-hidden="true"></span>
+                {label}
+              </li>
+            ))}
+          </ul>
+
+          <div class="dc-rows">
+            {group.rows.map((row) => (
+              <div class="dc-row">
+                <span class="dc-row-label">{row.label}</span>
+                <div class="dc-track">
+                  <div class="dc-bar" style={`width:${pct(row.actual)}%`}>
+                    <span class="dc-bar-value">{row.actual}</span>
+                  </div>
+                  {(row.references ?? []).map((ref) => (
+                    <span
+                      class="dc-mark"
+                      data-ref={Math.max(0, refLabels.indexOf(ref.label)) % 3}
+                      style={`left:${pct(ref.value)}%`}
+                    >
+                      <span class="dc-mark-value">{ref.value}</span>
+                    </span>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {group.note && <p class="dc-note">{group.note}</p>}
+        </div>
+      );
+    })}
+
+    {(data?.unit || data?.note) && (
+      <p class="dc-foot">
+        {data?.unit && <span>単位：{data.unit}</span>}
+        {data?.note && <span>{data.note}</span>}
+      </p>
+    )}
+  </figure>
+)}
+
+<style>
+  .dc {
+    margin: 1.75rem 0;
+    padding: 0;
+  }
+
+  .dc-title {
+    margin: 0 0 0.35rem;
+    font-size: 1rem;
+    font-weight: 700;
+    line-height: 1.6;
+    color: var(--color-text);
+  }
+
+  .dc-lead {
+    margin: 0 0 1.1rem;
+    font-size: 0.95rem;
+    line-height: 1.8;
+    color: var(--color-text);
+  }
+
+  .dc-group + .dc-group {
+    margin-top: 1.6rem;
+  }
+
+  .dc-group-label {
+    margin: 0 0 0.3rem;
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--color-text);
+  }
+
+  .dc-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.3rem 1rem;
+    margin: 0 0 0.8rem;
+    padding: 0;
+    list-style: none;
+    font-size: 0.78rem;
+    line-height: 1.5;
+    color: var(--color-text-muted);
+  }
+
+  .dc-legend li {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+  }
+
+  .dc-key {
+    display: inline-block;
+    flex: none;
+    width: 14px;
+    height: 10px;
+    border-radius: 2px;
+    background: var(--color-primary);
+  }
+
+  .dc-key-ref {
+    width: 3px;
+    height: 14px;
+    border-radius: 1px;
+  }
+
+  /* 基準値は最大3系統まで色分けする（それ以上は循環） */
+  .dc-key-ref[data-ref='0'],
+  .dc-mark[data-ref='0'] {
+    background: var(--color-accent);
+  }
+  .dc-key-ref[data-ref='1'],
+  .dc-mark[data-ref='1'] {
+    background: var(--color-warn);
+  }
+  .dc-key-ref[data-ref='2'],
+  .dc-mark[data-ref='2'] {
+    background: var(--color-primary-dark);
+  }
+
+  /* マーカーのラベルが右端で切れないよう、行の右側に余白を確保する */
+  .dc-rows {
+    padding-right: 18px;
+  }
+
+  .dc-row {
+    display: grid;
+    grid-template-columns: 3.2em 1fr;
+    gap: 0.5rem;
+    align-items: center;
+    padding-top: 16px;
+  }
+
+  .dc-row-label {
+    font-size: 0.85rem;
+    line-height: 1.4;
+    color: var(--color-text-muted);
+  }
+
+  .dc-track {
+    position: relative;
+    height: 22px;
+    border-radius: 3px;
+    background: var(--color-bg-subtle);
+  }
+
+  .dc-bar {
+    position: absolute;
+    inset: 0 auto 0 0;
+    min-width: 2px;
+    border-radius: 3px;
+    background: var(--color-primary);
+  }
+
+  .dc-bar-value {
+    position: absolute;
+    right: 6px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 0.72rem;
+    line-height: 1;
+    color: #ffffff;
+    white-space: nowrap;
+  }
+
+  .dc-mark {
+    position: absolute;
+    top: -5px;
+    bottom: -5px;
+    width: 3px;
+    border-radius: 1px;
+    box-shadow: 0 0 0 1px var(--color-bg);
+  }
+
+  .dc-mark-value {
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    padding-bottom: 2px;
+    font-size: 0.7rem;
+    line-height: 1;
+    white-space: nowrap;
+  }
+
+  .dc-mark[data-ref='0'] .dc-mark-value {
+    color: var(--color-accent);
+  }
+  .dc-mark[data-ref='1'] .dc-mark-value {
+    color: var(--color-warn);
+  }
+  .dc-mark[data-ref='2'] .dc-mark-value {
+    color: var(--color-primary-dark);
+  }
+
+  .dc-note,
+  .dc-foot {
+    margin: 0.7rem 0 0;
+    font-size: 0.78rem;
+    line-height: 1.7;
+    color: var(--color-text-muted);
+  }
+
+  .dc-foot {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.2rem 1rem;
+  }
+
+  @media (max-width: 480px) {
+    .dc-row {
+      grid-template-columns: 2.8em 1fr;
+      gap: 0.4rem;
+    }
+
+    .dc-row-label {
+      font-size: 0.8rem;
+    }
+  }
+</style>

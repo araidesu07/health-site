@@ -15,18 +15,79 @@
  *   - 「最も安い」等の無条件の断定を避け、比較の基準を必ず添える
  */
 
+/** v3：結論に並べる推薦（products[] から渡される） */
+export interface ConclusionRecommendation {
+  direction?: string;
+  name: string;
+  keyPoint?: string;
+}
+
 interface Props {
-  /** 箇条書きにする結論。空・未指定なら何も描画しない */
+  /** legacy：箇条書きにする結論。空・未指定なら何も描画しない */
   items?: string[];
+  /** v3：Issue 1 への短い回答（conclusion.issue1） */
+  issue1?: string;
+  /** v3：Issue 2 の推薦一覧（products[] から生成） */
+  recommendations?: ConclusionRecommendation[];
   /** 見出し文言。通常は変えない */
   heading?: string;
 }
 
-const { items = [], heading = 'この記事の結論' } = Astro.props;
+const {
+  items = [],
+  issue1,
+  recommendations = [],
+  heading = 'この記事の結論',
+} = Astro.props;
 
 // frontmatter に conclusion を持たない既存記事では、丸ごと出力しない
 const hasItems = Array.isArray(items) && items.length > 0;
+
+// v3：issue1 があれば v3 描画。legacy（items）には一切影響しない
+const issue1Text = typeof issue1 === 'string' ? issue1.trim() : '';
+const recs = Array.isArray(recommendations)
+  ? recommendations.filter((r) => r && typeof r.name === 'string' && r.name.trim() !== '')
+  : [];
+const isV3 = issue1Text !== '' || recs.length > 0;
 ---
+
+{isV3 && (
+  <aside class="conclusion-box" aria-label={heading}>
+    <p class="conclusion-heading">
+      <svg
+        class="conclusion-heading-icon"
+        viewBox="0 0 20 20"
+        aria-hidden="true"
+        focusable="false"
+      >
+        <circle cx="10" cy="10" r="9" fill="currentColor" />
+        <path
+          d="M5.8 10.3l2.7 2.7 5.7-5.7"
+          fill="none"
+          stroke="#ffffff"
+          stroke-width="2.2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        />
+      </svg>
+      <span>{heading}</span>
+    </p>
+
+    {issue1Text && <p class="conclusion-issue1">{issue1Text}</p>}
+
+    {recs.length > 0 && (
+      <ul class="conclusion-recs">
+        {recs.map((rec) => (
+          <li>
+            {rec.direction && <span class="conclusion-rec-direction">{rec.direction}なら</span>}
+            <span class="conclusion-rec-name">{rec.name}</span>
+            {rec.keyPoint && <span class="conclusion-rec-key">{rec.keyPoint}</span>}
+          </li>
+        ))}
+      </ul>
+    )}
+  </aside>
+)}
 
 {hasItems && (
   <aside class="conclusion-box" aria-label={heading}>
@@ -142,6 +203,60 @@ const hasItems = Array.isArray(items) && items.length > 0;
 
     .conclusion-list li {
       font-size: 0.95rem;
+    }
+  }
+</style>
+
+<style>
+  /* v3：Issue 1 の回答 → Issue 2 の推薦、の順で見せる */
+  .conclusion-issue1 {
+    margin: 0 0 1rem;
+    line-height: 1.85;
+    color: var(--color-text);
+  }
+
+  .conclusion-recs {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: grid;
+    gap: 0.5rem;
+  }
+
+  .conclusion-recs li {
+    display: grid;
+    grid-template-columns: 11em 1fr;
+    gap: 0.15rem 0.75rem;
+    align-items: baseline;
+    padding: 0.6rem 0.85rem;
+    border-radius: 5px;
+    background: var(--color-bg);
+    line-height: 1.7;
+  }
+
+  .conclusion-rec-direction {
+    font-size: 0.9rem;
+    color: var(--color-text-muted);
+  }
+
+  .conclusion-rec-name {
+    font-weight: 700;
+  }
+
+  .conclusion-rec-key {
+    grid-column: 2;
+    font-size: 0.85rem;
+    color: var(--color-text-muted);
+  }
+
+  @media (max-width: 640px) {
+    .conclusion-recs li {
+      grid-template-columns: 1fr;
+      gap: 0.1rem;
+    }
+
+    .conclusion-rec-key {
+      grid-column: 1;
     }
   }
 </style>

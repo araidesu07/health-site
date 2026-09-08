@@ -1,0 +1,99 @@
+---
+/**
+ * カテゴリ検討ブロック（v2 記事順序の 2 番目）
+ *
+ * 結論ボックスの直下、選び方の軸の上に置く。
+ * 「そもそもこのカテゴリを検討するか」を短く示すためのブロックで、
+ * カテゴリ解説を長々と書く場所ではない。
+ *
+ *   categoryDecision:
+ *     title: "鉄サプリはどんなときに選ばれる商品か"
+ *     body:
+ *       - "食事以外の手段として選ばれている食品カテゴリです。"
+ *       - "医薬品の鉄剤とは制度上の区分が異なります。"
+ *     notice: "商品区分は各社の公式表示で確認しています。"
+ *
+ * 中身のルール（本文量・書いてよいこと）は書き手側の責任。
+ * このコンポーネントは検査しない。
+ *
+ * frontmatter に categoryDecision を持たない既存記事では、丸ごと出力しない。
+ */
+
+export interface CategoryDecisionData {
+  /** ブロックの見出し */
+  title: string;
+  /** 短い説明。1項目＝1段落。長文にしないこと */
+  body: string[];
+  /** 補足・前提。省略可 */
+  notice?: string;
+}
+
+interface Props {
+  /** 記事 frontmatter の categoryDecision。空・未指定なら何も描画しない */
+  data?: CategoryDecisionData;
+}
+
+const { data } = Astro.props;
+
+const title = data?.title?.trim();
+const body = Array.isArray(data?.body)
+  ? data.body.filter((text) => typeof text === 'string' && text.trim() !== '')
+  : [];
+const notice = data?.notice?.trim();
+
+// 見出しと本文の両方が揃っているときだけ描画する
+const hasContent = Boolean(title) && body.length > 0;
+---
+
+{hasContent && (
+  <section class="category-decision" aria-label={title}>
+    <h2 class="category-decision-title">{title}</h2>
+
+    <div class="category-decision-body">
+      {body.map((text) => <p>{text}</p>)}
+    </div>
+
+    {notice && <p class="category-decision-notice">{notice}</p>}
+  </section>
+)}
+
+<style>
+  /* 色・余白は global.css の :root 変数をそのまま使う。生の色コードは書かない */
+  .category-decision {
+    margin: 0 0 2.5rem;
+  }
+
+  /* global.css の h2 と同じ見た目にする。
+     ただし本文の h2 は margin-top:3rem を持つので、ここでは詰める */
+  .category-decision-title {
+    margin-top: 0;
+  }
+
+  .category-decision-body > p:last-child {
+    margin-bottom: 0;
+  }
+
+  /* 前提・補足。box-note と同じトーンだが、囲みにはしない */
+  .category-decision-notice {
+    margin: 1rem 0 0;
+    padding-left: 0.9rem;
+    border-left: 3px solid var(--color-border);
+    font-size: 0.875rem;
+    line-height: 1.8;
+    color: var(--color-text-muted);
+  }
+
+  @media (max-width: 640px) {
+    .category-decision {
+      margin-bottom: 2rem;
+    }
+
+    .category-decision-body {
+      font-size: 0.95rem;
+    }
+
+    .category-decision-notice {
+      font-size: 0.85rem;
+    }
+  }
+</style>
