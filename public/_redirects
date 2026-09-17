@@ -1,0 +1,7 @@
+# Cloudflare Workers Static Assets のリダイレクト定義。
+# 書式：[source] [destination] [code]（省略時は 302）
+# このファイルは public/ に置くと、ビルド時に dist/ の直下へコピーされる。
+
+# ミノキシジル記事のカテゴリを skincare から otc へ変更（2026-09-17）。
+# 旧URLは公開済みのため、404 にせず新URLへ恒久的に転送する。
+/skincare/minoxidil-5-otc/ /otc/minoxidil-5-otc/ 301

@@ -1,0 +1,40 @@
+---
+/**
+ * OTC（一般用医薬品）カテゴリの一覧ページ（/otc/）。
+ *
+ * トップページの「OTC」から記事へ辿れるようにするための最小構成。
+ * /supplement/ と同じ設計にしている。
+ * 記事は自動収集せず、掲載するものだけをここに書く。
+ */
+import Layout from '../../layouts/Layout.astro';
+import { SITE_NAME } from '../../consts';
+
+const CATEGORY_NAME = 'OTC';
+const CATEGORY_DESCRIPTION =
+  '薬局・ドラッグストアや通販で買える一般用医薬品（OTC医薬品）を、承認された効能・効果と成分から比較した記事です。';
+
+/** 一覧に載せる記事。title / description は各記事の frontmatter と同じ文言 */
+const articles = [
+  {
+    href: '/otc/minoxidil-5-otc/',
+    title: '市販発毛剤どれを選んだらいいの？',
+    description:
+      '成人男性の壮年性脱毛症に使うミノキシジル5%配合の第1類医薬品4商品を比較。効能・効果と、価格・内容量・ミノキシジル以外の有効成分・容器・購入方法の違いを整理します。',
+  },
+];
+---
+
+<Layout title={`${CATEGORY_NAME}｜${SITE_NAME}`} description={CATEGORY_DESCRIPTION}>
+  <h1>{CATEGORY_NAME}</h1>
+
+  <p>{CATEGORY_DESCRIPTION}</p>
+
+  <ul>
+    {articles.map((article) => (
+      <li>
+        <a href={article.href}>{article.title}</a>
+        <p>{article.description}</p>
+      </li>
+    ))}
+  </ul>
+</Layout>
