@@ -1,0 +1,41 @@
+---
+/**
+ * サプリメントカテゴリの一覧ページ（/supplement/）。
+ *
+ * トップページの「サプリメント」から記事へ辿れるようにするための最小構成。
+ * 記事は自動収集しない：同ディレクトリには検証用のページ
+ * （iron-supplement-preview / -prototype / -v2）が同居しており、
+ * glob で拾うとそれらも一覧に出てしまうため、掲載するものだけをここに書く。
+ */
+import Layout from '../../layouts/Layout.astro';
+import { SITE_NAME } from '../../consts';
+
+const CATEGORY_NAME = 'サプリメント';
+const CATEGORY_DESCRIPTION =
+  '市販のサプリメントを、成分表示とメーカー公式の情報から比較した記事です。';
+
+/** 一覧に載せる記事。title / description は各記事の frontmatter と同じ文言 */
+const articles = [
+  {
+    href: '/supplement/iron-supplement-comparison/',
+    title: '鉄サプリはどれを買う？現役薬剤師のおすすめ3選！',
+    description:
+      '鉄サプリを検討したほうがいいのはどんな人か、買うならどれか。厚生労働省の推奨量・摂取量データと、メーカー公式で確認した価格・成分をもとに、個人的おすすめ3製品を選びました。',
+  },
+];
+---
+
+<Layout title={`${CATEGORY_NAME}｜${SITE_NAME}`} description={CATEGORY_DESCRIPTION}>
+  <h1>{CATEGORY_NAME}</h1>
+
+  <p>{CATEGORY_DESCRIPTION}</p>
+
+  <ul>
+    {articles.map((article) => (
+      <li>
+        <a href={article.href}>{article.title}</a>
+        <p>{article.description}</p>
+      </li>
+    ))}
+  </ul>
+</Layout>
