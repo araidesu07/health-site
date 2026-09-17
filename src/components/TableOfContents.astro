@@ -7,37 +7,63 @@
  *   「おすすめ商品をざっくり比較」 → #recommendations
  *   products[].name           → #product-1 / #product-2 / ...
  *
+ * #issue-one は、IssueOneSection が実際に描画されるときだけ出す（死んだアンカーを作らない）。
+ * 判定は IssueOneSection.astro の hasIssueOneContent() を共有する。
+ *
  * productId はアンカーにも本文にも露出させない。
  * 結論より目立たせない。固定追従にしない。
  */
 import type { Product } from './ProductCard.astro';
+import { hasIssueOneContent } from './IssueOneSection.astro';
+import type { IssueOneData } from './IssueOneSection.astro';
 
 interface Props {
   /** Issue 1 セクションの見出し（issueOne.title） */
   issueOneTitle?: string;
+  /**
+   * 記事 frontmatter の issueOne。
+   * 渡された場合は IssueOneSection と同じ条件で #issue-one の有無を決める。
+   * 渡されない場合は issueOneTitle の有無だけで判定する（従来どおり）。
+   */
+  issueOne?: IssueOneData;
   /** 記事 frontmatter の products */
   products?: Product[];
   /** ざっくり比較の見出し。RecommendationSummary と揃える */
   summaryHeading?: string;
   /** 見出し文言。通常は変えない */
   heading?: string;
+  /** schema v4 か。見出し文言を RecommendationSummary と揃えるために使う */
+  v4?: boolean;
 }
 
 const {
   issueOneTitle,
+  issueOne,
   products = [],
-  summaryHeading = 'おすすめ商品をざっくり比較',
+  summaryHeading: summaryHeadingProp,
   heading = '目次',
+  v4 = false,
 } = Astro.props;
 
 const productItems = Array.isArray(products)
   ? products.filter((p) => p && typeof p.name === 'string' && p.name.trim() !== '')
   : [];
 
+// v4 は「おすすめ」と言わない（RecommendationSummary の既定と同じ文言・同じ件数にする）
+const summaryHeading =
+  summaryHeadingProp ??
+  (v4 ? `${productItems.length}商品の違いを比較` : 'おすすめ商品をざっくり比較');
+
 const items: { href: string; label: string }[] = [];
 
-if (typeof issueOneTitle === 'string' && issueOneTitle.trim() !== '') {
-  items.push({ href: '#issue-one', label: issueOneTitle.trim() });
+// 見出しは issueOne.title（validator が v3 で必須にしている）
+const issueOneLabel = (issueOne?.title ?? issueOneTitle ?? '').trim();
+// issueOne が渡されていれば IssueOneSection と同じ判定。無ければ従来どおり見出しの有無で判定する
+const showIssueOne =
+  issueOneLabel !== '' && (issueOne === undefined || hasIssueOneContent(issueOne));
+
+if (showIssueOne) {
+  items.push({ href: '#issue-one', label: issueOneLabel });
 }
 
 if (productItems.length > 0) {

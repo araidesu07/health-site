@@ -1,16 +1,22 @@
 ---
 /**
- * おすすめ商品のざっくり比較（schema v3）
+ * 紹介商品のざっくり比較（schema v3 / v4）
  *
  * 専用の frontmatter キーは持たない。products[] から生成する（SSoT は products[]）。
- * 出すのは 商品画像／商品名／こんな人向け／ざっくり特徴 だけ。
  * 詳細スペック・注意事項はここに置かない（商品ごとの独立章が担当する）。
+ *
+ *   v3（既存記事）… 商品画像／商品名／こんな人向け（direction）／ざっくり特徴（keyPoint）
+ *   v4（共通形式）… 商品画像／商品名＋メーカー／価格／ざっくり特徴（keyPoint）
+ *
+ * v4 では商品間の優劣・順位・「こんな人向け」を作らない。並び順に意味を持たせない。
  *
  * PC は比較表形式。狭い画面では横スクロールさせず、
  * 1商品＝1ブロックとして画像＋情報が縦に並ぶ形へ切り替える。
  */
 import { toLargeImage } from './ProductCard.astro';
 import type { Product } from './ProductCard.astro';
+import InlineText from './InlineText.astro';
+import SectionHeader from './SectionHeader.astro';
 
 interface Props {
   /** 記事 frontmatter の products。空・未指定なら何も描画しない */
@@ -18,18 +24,32 @@ interface Props {
   /** 見出し文言。通常は変えない */
   heading?: string;
   /**
-   * 表の直下に1回だけ置く注記。その場で価格差を誤解させないための短いもの。
-   * 記事の価格比較はメーカー公式価格が基準で、リンク先の販売価格とは別データであることを示す。
-   * 商品ごとに繰り返さない。記事全体の価格条件は記事末尾の注記が受け持つ。
+   * 表の直下に1回だけ置く注記。**既定値を持たない。**
+   * 価格の取得日・価格種別・比較条件は記事ごとに違うため、表示層が事実を作らない。
+   * 記事全体の価格条件は記事 frontmatter の priceNote に一本化する
+   * （ArticleLayout が出典の直前に1回だけ描画する）。
+   * 明示的に渡されたときだけ描画する。
    */
   note?: string;
+  /**
+   * 表の直前に置く短い前置き（記事 frontmatter の comparisonLead）。**既定値を持たない。**
+   * 何が共通で、どこに違いが出るのかを記事側が1〜3文で書く。表示層は事実を作らない。
+   */
+  lead?: string;
+  /** schema v4 の描画にするか。ArticleLayout が渡す。既定は v3 描画 */
+  v4?: boolean;
 }
 
 const {
   items = [],
-  heading = 'おすすめ商品をざっくり比較',
-  note = '※価格は2026年9月時点の各メーカー公式サイトの通常価格を基準にしています。通販価格は販売店・時期などにより異なります。',
+  heading: headingProp,
+  note,
+  lead,
+  v4 = false,
 } = Astro.props;
+
+const noteText = typeof note === 'string' ? note.trim() : '';
+const leadText = typeof lead === 'string' ? lead.trim() : '';
 
 const rows = Array.isArray(items)
   ? items.filter((p) => p && typeof p.name === 'string' && p.name.trim() !== '')
@@ -37,25 +57,145 @@ const rows = Array.isArray(items)
 
 const hasRows = rows.length > 0;
 
+// v4 は「おすすめ」と言わない。件数は products[] から取る（表示層が数を持たない）
+const heading =
+  headingProp ?? (v4 ? `${rows.length}商品の違いを比較` : 'おすすめ商品をざっくり比較');
+
 // 1件でも画像があれば画像列を出す。1件も無ければ画像領域そのものを作らない
 // ASP 提供の画像URLは加工しない。legacy（affiliateUrl なし）だけ従来の正規化を通す
 const imageOf = (p: Product) =>
   (typeof p.affiliateUrl === "string" && p.affiliateUrl.trim() !== "" ? p.image : toLargeImage(p.image));
-const hasAnyImage = rows.some((p) => Boolean(imageOf(p)));
+// v3：画像は独立した列。v4：商品名セルの中に並べるので、画像列そのものは作らない
+const hasAnyImage = !v4 && rows.some((p) => Boolean(imageOf(p)));
 // 1件でも購入リンクがあればCTA列を出す。1件も無ければ列そのものを作らない
 const buyUrlOf = (p: Product) => ((p.affiliateUrl ?? p.url ?? '').trim() || undefined);
 const buyLabelOf = (p: Product) => ((p.affiliateLabel ?? '').trim() || 'この商品をチェック');
-const hasAnyCta = rows.some((p) => Boolean(buyUrlOf(p)));
+// v4：比較表の中にはCTAを置かない。導線は結論の一覧と商品詳細の2か所に絞る（v3 の描画は変えない）
+const hasAnyCta = !v4 && rows.some((p) => Boolean(buyUrlOf(p)));
+
+/* ------------------------------------------------------------------
+   v4 の数値比較表の列を、products[] から機械的に決める。
+
+   supportingFacts は「ラベル：値」の1行で書かれる（記事側の書式）。
+   そこからラベルを取り出し、**全商品が共通で持つラベルだけ**を列にする。
+   一部の商品にしか無い項目を列にすると空欄が並び、比較として誤読を招くため。
+   価格・内容量は専用キーが正なので、先頭に固定で置く（全商品が持つときだけ）。
+
+   カテゴリ固有のラベル名はここに持たない。何が列になるかは記事の内容で決まる。
+   ------------------------------------------------------------------ */
+const SEPARATOR = /[：:]/;
+
+/** 「ラベル：値」を分解する。区切りが無い行はラベルを持たない事実として捨てる */
+function factPairs(p: Product): Map<string, string> {
+  const map = new Map<string, string>();
+  const facts = Array.isArray(p.supportingFacts) ? p.supportingFacts : [];
+  for (const fact of facts) {
+    if (typeof fact !== 'string') continue;
+    const at = fact.search(SEPARATOR);
+    if (at <= 0) continue;
+    const label = fact.slice(0, at).trim();
+    const value = fact.slice(at + 1).trim();
+    if (label === '' || value === '') continue;
+    if (!map.has(label)) map.set(label, value);
+  }
+  return map;
+}
+
+const factMaps = rows.map((p) => factPairs(p));
+
+const hasEvery = (get: (p: Product) => string | undefined) =>
+  rows.length > 0 && rows.every((p) => (get(p) ?? '').trim() !== '');
+
+const DEDICATED: { label: string; get: (p: Product) => string | undefined }[] = [
+  { label: '価格', get: (p) => p.price },
+  { label: '内容量', get: (p) => p.volume },
+];
+
+const dedicatedColumns = DEDICATED.filter((c) => hasEvery(c.get)).map((c) => c.label);
+
+// 1件目の並び順を基準に、全商品が持つラベルだけを残す
+const sharedFactLabels = v4
+  ? [...(factMaps[0]?.keys() ?? [])].filter(
+      (label) =>
+        !dedicatedColumns.includes(label) && factMaps.every((m) => (m.get(label) ?? '') !== ''),
+    )
+  : [];
+
+const specColumns = v4 ? [...dedicatedColumns, ...sharedFactLabels] : [];
+
+/** 表のセル。専用キーが先、無ければ supportingFacts から引く */
+function specValue(item: Product, label: string): string {
+  const dedicated = DEDICATED.find((c) => c.label === label);
+  if (dedicated) return (dedicated.get(item) ?? '').trim();
+  const index = rows.indexOf(item);
+  return (factMaps[index]?.get(label) ?? '').trim();
+}
 ---
 
 {hasRows && (
   <section class="rec-summary" id="recommendations" aria-label={heading}>
-    <h2 class="rec-summary-heading">{heading}</h2>
+    {/* 番号・小ラベルは記事構造から決まる値。記事 frontmatter からは受け取らない */}
+    <SectionHeader number="02" eyebrow="商品ごとの違い" title={heading} />
 
+    {leadText && <p class="rec-summary-lead"><InlineText text={leadText} /></p>}
+
+    {/* v4：まず画像＋商品名＋主な違いを数秒で掴ませ、数字の比較はそのあとに置く */}
+    {v4 && (
+      <ul class="rec-cards">
+        {rows.map((item) => {
+          const src = imageOf(item);
+          return (
+            <li class="rec-card">
+              {src && (
+                <span class="rec-card-thumb">
+                  <img src={src} alt={item.name} loading="lazy" decoding="async" />
+                </span>
+              )}
+              <p class="rec-card-name">{item.name}</p>
+              {item.maker && <p class="rec-card-maker">{item.maker}</p>}
+              {item.keyPoint && (
+                <p class="rec-card-key">
+                  <span class="rec-card-key-label">主な違い</span>
+                  {item.keyPoint}
+                </p>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+    )}
+
+    {/* v4：全商品が同じ項目を持つときだけ列にする。空欄の出る項目は表に載せない */}
+    {v4 && specColumns.length > 0 && (
+      <details class="rec-table" open>
+        <summary>数字で並べて見る</summary>
+        <div class="rec-table-scroll">
+          <table class="rec-table-grid">
+            <thead>
+              <tr>
+                <th scope="col">商品</th>
+                {specColumns.map((label) => <th scope="col">{label}</th>)}
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((item) => (
+                <tr>
+                  <th scope="row">{item.name}</th>
+                  {specColumns.map((label) => <td>{specValue(item, label)}</td>)}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </details>
+    )}
+
+    {!v4 && (
     <ul
       class="rec-summary-list"
       data-with-image={hasAnyImage ? 'true' : 'false'}
       data-with-cta={hasAnyCta ? 'true' : 'false'}
+      data-schema="v3"
     >
       {rows.map((item) => {
         const src = imageOf(item);
@@ -76,16 +216,19 @@ const hasAnyCta = rows.some((p) => Boolean(buyUrlOf(p)));
 
             <span class="rec-summary-cell rec-summary-name">
               <span class="rec-summary-label">商品</span>
-              <span class="rec-summary-value">{item.name}</span>
+              <span class="rec-summary-value">
+                <span class="rec-summary-name-text">{item.name}</span>
+              </span>
             </span>
 
+            {/* v3 の「こんな人向け」。v4 はこのリストを使わない */}
             <span class="rec-summary-cell rec-summary-direction">
               <span class="rec-summary-label">こんな人向け</span>
               <span class="rec-summary-value">{item.direction ?? item.tag}</span>
             </span>
 
             <span class="rec-summary-cell rec-summary-key">
-              <span class="rec-summary-label">ざっくり特徴</span>
+              <span class="rec-summary-label">主な違い</span>
               <span class="rec-summary-value">{item.keyPoint}</span>
             </span>
 
@@ -107,19 +250,185 @@ const hasAnyCta = rows.some((p) => Boolean(buyUrlOf(p)));
         );
       })}
     </ul>
+    )}
 
-    {/* CTA を出すときだけ、価格の基準が別データであることを1回だけ添える */}
-    {hasAnyCta && note && <p class="rec-summary-note">{note}</p>}
+    {/* 呼び出し側が明示的に渡したときだけ。既定の注記は持たない */}
+    {noteText && <p class="rec-summary-note"><InlineText text={noteText} /></p>}
   </section>
 )}
 
 <style>
+  /* --- v4：商品サマリーカード ------------------------------------------ */
+
+  .rec-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+    gap: 1.1rem;
+    margin: 0 0 2rem;
+    padding: 0;
+    list-style: none;
+  }
+
+  .rec-card {
+    display: flex;
+    flex-direction: column;
+    padding: 1.15rem 1.05rem 1.2rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    background: var(--color-bg);
+    box-shadow: var(--shadow-card);
+  }
+
+  .rec-card-thumb {
+    display: grid;
+    place-items: center;
+    height: 8.5rem;
+    margin-bottom: 0.9rem;
+    border-radius: var(--radius-md);
+    background: var(--color-bg-subtle);
+  }
+
+  .rec-card-thumb img {
+    max-height: 7.5rem;
+    width: auto;
+    mix-blend-mode: multiply;
+  }
+
+  .rec-card-name {
+    margin: 0 0 0.2rem;
+    font-size: 0.97rem;
+    font-weight: 800;
+    line-height: 1.55;
+    color: var(--color-text);
+  }
+
+  .rec-card-maker {
+    margin: 0 0 0.75rem;
+    color: var(--color-text-faint);
+    font-size: 0.76rem;
+    line-height: 1.6;
+  }
+
+  /* 「主な違い」はカードの下端に揃える。カードの高さが違っても読む位置が動かない */
+  .rec-card-key {
+    margin: auto 0 0;
+    padding: 0.7rem 0.8rem;
+    border-radius: var(--radius-sm);
+    background: var(--color-primary-light);
+    font-size: 0.86rem;
+    font-weight: 600;
+    line-height: 1.7;
+    color: var(--color-primary-dark);
+  }
+
+  .rec-card-key-label {
+    display: block;
+    margin-bottom: 0.1rem;
+    color: var(--color-accent);
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+  }
+
+  /* --- v4：数値の比較表（カードのあと） -------------------------------- */
+
+  /* 浮かせる対象にしない。薄い枠だけで白地の上に置く */
+  .rec-table {
+    padding: 0.2rem 1.2rem 1.2rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    background: var(--color-bg);
+  }
+
+  .rec-table > summary {
+    padding: 1rem 0;
+    color: var(--color-primary);
+    font-size: 0.9rem;
+    font-weight: 700;
+    cursor: pointer;
+  }
+
+  .rec-table-scroll {
+    overflow-x: auto;
+  }
+
+  /* global.css の th は深い青緑のベタ塗り（背景=--color-primary／文字=白）。
+     この表はヘッダー行と商品名列がどちらも th なので、両方が濃色に塗られて読みにくい。
+     ここで淡いグリーンに塗り分ける。濃い青緑は文字・罫線だけに使う。
+     この指定はこのコンポーネントに閉じているため、記事本文の Markdown 表は変わらない。 */
+  .rec-table-grid {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+
+    /* 既存トークンの淡いグリーンを基準にし、行見出し用はそこからさらに淡くする */
+    --rec-head-bg: var(--color-primary-light);
+    --rec-rowhead-bg: #f5faf9; /* color-mix 未対応ブラウザ向け */
+    --rec-rowhead-bg: color-mix(in srgb, var(--color-primary-light) 55%, #ffffff);
+  }
+
+  .rec-table-grid th,
+  .rec-table-grid td {
+    padding: 0.7rem 0.75rem;
+    border-bottom: 1px solid var(--color-border-soft);
+    text-align: left;
+    vertical-align: top;
+    line-height: 1.7;
+  }
+
+  /* ヘッダー行：淡いグリーン＋濃い文字 */
+  .rec-table-grid thead th {
+    background: var(--rec-head-bg);
+    border-bottom: 1px solid var(--color-primary-border);
+    color: var(--color-primary-dark);
+    font-size: 0.76rem;
+    font-weight: 700;
+    white-space: nowrap;
+  }
+
+  /* 商品名列：ヘッダーよりさらに淡いグリーン＋濃い文字 */
+  .rec-table-grid tbody th {
+    min-width: 11rem;
+    background: var(--rec-rowhead-bg);
+    font-weight: 700;
+    color: var(--color-text);
+  }
+
+  /* データセルは白。global.css の交互行は、商品名列の淡い塗りと干渉するため切る */
+  .rec-table-grid tbody td {
+    background: var(--color-bg);
+  }
+
+  .rec-table-grid tbody tr:nth-child(even) {
+    background: transparent;
+  }
+
+  .rec-table-grid tbody tr:last-child th,
+  .rec-table-grid tbody tr:last-child td {
+    border-bottom: 0;
+  }
+
+  @media (max-width: 560px) {
+    .rec-table {
+      padding: 0.2rem 1rem 1rem;
+    }
+
+    .rec-table-grid tbody th {
+      min-width: 9rem;
+    }
+  }
+
   .rec-summary {
-    margin: 0 0 2.5rem;
+    margin: 0 0 3.6rem;
   }
 
   .rec-summary-heading {
     margin: 0 0 1rem;
+  }
+
+  .rec-summary-lead {
+    margin: 0 0 1.4rem;
+    line-height: 1.9;
   }
 
   .rec-summary-list {
@@ -150,6 +459,73 @@ const hasAnyCta = rows.some((p) => Boolean(buyUrlOf(p)));
 
   .rec-summary-list[data-with-image='true'][data-with-cta='true'] .rec-summary-row {
     grid-template-columns: 96px minmax(0, 2.2fr) minmax(0, 1fr) minmax(0, 1.05fr) 8.5em;
+  }
+
+  /* v4：商品 / 価格 / ざっくり特徴 の3列。鉄サプリ記事と同じ情報密度にする */
+  .rec-summary-list[data-schema='v4'] .rec-summary-row {
+    grid-template-columns: minmax(0, 2.6fr) minmax(0, 1fr) minmax(0, 1.8fr);
+    align-items: center;
+  }
+
+  .rec-summary-list[data-schema='v4'][data-with-image='true'] .rec-summary-row {
+    grid-template-columns: 96px minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1.9fr);
+  }
+
+  .rec-summary-list[data-schema='v4'][data-with-cta='true'] .rec-summary-row {
+    grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1.9fr) 8.5em;
+  }
+
+  .rec-summary-list[data-schema='v4'][data-with-image='true'][data-with-cta='true'] .rec-summary-row {
+    grid-template-columns: 96px minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1.9fr) 8.5em;
+  }
+
+  /* v4：商品名セルの中に置くサムネイル。画像は主役ではないので枠線を付けず、
+     白背景の商品画像でも輪郭が消えないよう、淡い下地と余白だけ持たせる */
+  .rec-summary-list[data-schema="v4"] .rec-summary-value {
+    display: flex;
+    align-items: center;
+    gap: 0.7rem;
+  }
+
+  .rec-summary-thumb {
+    flex: none;
+    display: block;
+    width: 84px;
+    height: 84px;
+    padding: 4px;
+    border-radius: 6px;
+    background: var(--color-bg-subtle);
+  }
+
+  .rec-summary-thumb img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+  }
+
+  .rec-summary-name-text {
+    min-width: 0;
+  }
+
+  /* v4：商品名の下にメーカー名を小さく置く */
+  .rec-summary-maker {
+    display: block;
+    margin-top: 0.15rem;
+    font-size: 0.75rem;
+    font-weight: 400;
+    color: var(--color-text-muted);
+  }
+
+  /* v4：列が増えるぶん、PCでも列見出しを出して何の値か分かるようにする */
+  .rec-summary-list[data-schema='v4'] .rec-summary-label {
+    display: block;
+    margin-bottom: 0.1rem;
+  }
+
+  .rec-summary-list[data-schema='v4'] .rec-summary-cell {
+    font-size: 0.85rem;
+    line-height: 1.65;
   }
 
   .rec-summary-cta {
@@ -257,6 +633,12 @@ const hasAnyCta = rows.some((p) => Boolean(buyUrlOf(p)));
       margin-top: 0.35rem;
     }
 
+    /* 狭い画面ではサムネイルを小さくし、価格・主な違いの可読性を優先する */
+    .rec-summary-thumb {
+      width: 68px;
+      height: 68px;
+    }
+
     .rec-summary-label {
       display: block;
       margin-bottom: 0.05rem;
@@ -268,6 +650,29 @@ const hasAnyCta = rows.some((p) => Boolean(buyUrlOf(p)));
 
     .rec-summary-name .rec-summary-value {
       font-size: 1.02rem;
+    }
+
+    /* v4 は列が5つあるので、狭い画面では画像の右に1列で縦積みする */
+    .rec-summary-list[data-schema='v4'] .rec-summary-row,
+    .rec-summary-list[data-schema='v4'][data-with-image='true'] .rec-summary-row,
+    .rec-summary-list[data-schema='v4'][data-with-cta='true'] .rec-summary-row,
+    .rec-summary-list[data-schema='v4'][data-with-image='true'][data-with-cta='true'] .rec-summary-row {
+      grid-template-columns: 72px 1fr;
+    }
+
+    .rec-summary-list[data-schema='v4'][data-with-image='false'] .rec-summary-row,
+    .rec-summary-list[data-schema='v4'][data-with-image='false'][data-with-cta='true'] .rec-summary-row {
+      grid-template-columns: 1fr;
+    }
+
+    /* 商品名だけ画像の右に置き、スペック以降は行を折り返して全幅で並べる */
+    .rec-summary-list[data-schema='v4'] .rec-summary-image {
+      grid-row: 1;
+    }
+
+    .rec-summary-list[data-schema='v4'] .rec-summary-spec,
+    .rec-summary-list[data-schema='v4'] .rec-summary-key {
+      grid-column: 1 / -1;
     }
   }
 </style>

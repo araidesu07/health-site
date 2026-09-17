@@ -15,11 +15,18 @@
  *   - 「最も安い」等の無条件の断定を避け、比較の基準を必ず添える
  */
 
+import AffiliateCTA from './AffiliateCTA.astro';
+import InlineText from './InlineText.astro';
+
 /** v3：結論に並べる推薦（products[] から渡される） */
 export interface ConclusionRecommendation {
   direction?: string;
   name: string;
   keyPoint?: string;
+  /** 販売ページへの導線。運営者が付与する。未指定ならCTAを出さない */
+  affiliateUrl?: string;
+  affiliateLabel?: string;
+  affiliateProvider?: string;
 }
 
 interface Props {
@@ -73,7 +80,7 @@ const isV3 = issue1Text !== '' || recs.length > 0;
       <span>{heading}</span>
     </p>
 
-    {issue1Text && <p class="conclusion-issue1">{issue1Text}</p>}
+    {issue1Text && <p class="conclusion-issue1"><InlineText text={issue1Text} /></p>}
 
     {recs.length > 0 && (
       <ul class="conclusion-recs">
@@ -82,6 +89,17 @@ const isV3 = issue1Text !== '' || recs.length > 0;
             {rec.direction && <span class="conclusion-rec-direction">{rec.direction}なら</span>}
             <span class="conclusion-rec-name">{rec.name}</span>
             {rec.keyPoint && <span class="conclusion-rec-key">{rec.keyPoint}</span>}
+            {rec.affiliateUrl && (
+              <span class="conclusion-rec-cta">
+                <AffiliateCTA
+                  url={rec.affiliateUrl}
+                  label={rec.affiliateLabel}
+                  provider={rec.affiliateProvider}
+                  variant="compact"
+                  ariaLabel={`${rec.name}｜${(rec.affiliateLabel ?? "").trim() || "販売ページを見る"}（外部サイト）`}
+                />
+              </span>
+            )}
           </li>
         ))}
       </ul>
@@ -137,31 +155,36 @@ const isV3 = issue1Text !== '' || recs.length > 0;
 )}
 
 <style>
-  /* design-spec.md の CSS 変数（:root）をそのまま使う。生の色コードは書かない */
+  /* 色は global.css の :root 変数だけを使う。生の色コードは書かない。
+     白地の上に浮く白カード。面を塗らず、border と影で「まとまり」を作る */
   .conclusion-box {
-    background: var(--color-accent-light);
-    border-left: 4px solid var(--color-accent);
-    border-radius: 6px;
-    padding: 1.5rem;
-    margin: 0 0 2.5rem;
+    background: var(--color-bg);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-card);
+    padding: 1.8rem 1.6rem 1.6rem;
+    margin: 0 0 3.4rem;
   }
 
+  /* 見出しはピル型のラベル。最初に「これが結論」と分かることだけを担う */
   .conclusion-heading {
-    display: flex;
+    display: inline-flex;
     align-items: center;
-    gap: 0.5rem;
-    margin: 0 0 1rem;
-    font-size: 1.05rem;
+    gap: 0.4rem;
+    margin: 0 0 0.9rem;
+    padding: 0.3rem 0.85rem;
+    border-radius: 999px;
+    background: var(--color-primary);
+    font-size: 0.78rem;
     font-weight: 700;
-    line-height: 1.5;
-    color: var(--color-text);
+    letter-spacing: 0.06em;
+    line-height: 1.6;
+    color: #fff;
   }
 
+  /* ピルの中ではアイコンは意味を持たないため出さない（markup は据え置き） */
   .conclusion-heading-icon {
-    flex: none;
-    width: 1.25em;
-    height: 1.25em;
-    color: var(--color-accent);
+    display: none;
   }
 
   .conclusion-list {
@@ -210,17 +233,27 @@ const isV3 = issue1Text !== '' || recs.length > 0;
 <style>
   /* v3：Issue 1 の回答 → Issue 2 の推薦、の順で見せる */
   .conclusion-issue1 {
-    margin: 0 0 1rem;
-    line-height: 1.85;
-    color: var(--color-text);
+    margin: 0 0 1.2rem;
+    font-size: 1.12rem;
+    font-weight: 600;
+    line-height: 1.95;
+    color: var(--color-primary-dark);
+  }
+
+  /* 重要語は色を変えず、淡いベージュの下線で持ち上げる */
+  .conclusion-issue1 :global(strong) {
+    padding: 0 0.15rem;
+    background: linear-gradient(transparent 62%, var(--color-sand) 62%);
+    font-weight: 800;
   }
 
   .conclusion-recs {
     margin: 0;
-    padding: 0;
+    padding: 1.1rem 0 0;
+    border-top: 1px dashed var(--color-border);
     list-style: none;
     display: grid;
-    gap: 0.5rem;
+    gap: 0.6rem;
   }
 
   .conclusion-recs li {
@@ -228,8 +261,9 @@ const isV3 = issue1Text !== '' || recs.length > 0;
     grid-template-columns: 11em 1fr;
     gap: 0.15rem 0.75rem;
     align-items: baseline;
-    padding: 0.6rem 0.85rem;
-    border-radius: 5px;
+    padding: 0.75rem 0.95rem;
+    border: 1px solid var(--color-border-soft);
+    border-radius: var(--radius-md);
     background: var(--color-bg);
     line-height: 1.7;
   }
@@ -249,13 +283,20 @@ const isV3 = issue1Text !== '' || recs.length > 0;
     color: var(--color-text-muted);
   }
 
+  /* 一言特徴の下に置く小さめの導線。行の高さを崩さないよう上に少し余白を取る */
+  .conclusion-rec-cta {
+    grid-column: 2;
+    margin-top: 0.35rem;
+  }
+
   @media (max-width: 640px) {
     .conclusion-recs li {
       grid-template-columns: 1fr;
       gap: 0.1rem;
     }
 
-    .conclusion-rec-key {
+    .conclusion-rec-key,
+    .conclusion-rec-cta {
       grid-column: 1;
     }
   }

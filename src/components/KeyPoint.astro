@@ -1,0 +1,77 @@
+---
+/**
+ * 要点ボックス
+ *
+ * そのまとまりで最も読ませたい一文を、淡いベージュの大きめボックスで見せる。
+ * 事実を作らない・言い換えない。記事側が渡した文をそのまま出す。
+ *
+ * ページ全体に色を敷かないため、この種の淡色背景は「意味のある箇所」だけに使う。
+ * 値が無ければ何も描画しない。
+ */
+import InlineText from './InlineText.astro';
+
+/** ラベルを変えたいときの形。文字列だけ渡す場合は既定ラベルを使う */
+export interface KeyPointObject {
+  label?: string;
+  text: string;
+}
+
+interface Props {
+  /** 文字列、または { label, text }。空・未指定なら何も描画しない */
+  data?: string | KeyPointObject | null;
+  /** ラベルの既定値。呼び出し側の文脈に合わせて変えてよい */
+  defaultLabel?: string;
+}
+
+const { data, defaultLabel = 'ここが要点' } = Astro.props;
+
+const text =
+  typeof data === 'string'
+    ? data.trim()
+    : data && typeof data.text === 'string'
+      ? data.text.trim()
+      : '';
+
+const label =
+  data && typeof data !== 'string' && typeof data.label === 'string' && data.label.trim() !== ''
+    ? data.label.trim()
+    : defaultLabel;
+---
+
+{text !== '' && (
+  <div class="keypoint">
+    {label && <p class="keypoint-label">{label}</p>}
+    <p class="keypoint-body"><InlineText text={text} /></p>
+  </div>
+)}
+
+<style>
+  .keypoint {
+    margin: 1.35rem 0;
+    padding: 1.15rem 1.25rem;
+    border: 1px solid var(--color-sand);
+    border-radius: var(--radius-md);
+    background: var(--color-sand-light);
+  }
+
+  .keypoint-label {
+    margin: 0 0 0.45rem;
+    color: var(--color-primary);
+    font-size: 0.76rem;
+    font-weight: 700;
+    letter-spacing: 0.07em;
+    line-height: 1.6;
+  }
+
+  .keypoint-body {
+    margin: 0;
+    font-size: 1.04rem;
+    font-weight: 600;
+    line-height: 1.9;
+    color: var(--color-text);
+  }
+
+  .keypoint-body :global(strong) {
+    color: var(--color-primary-dark);
+  }
+</style>

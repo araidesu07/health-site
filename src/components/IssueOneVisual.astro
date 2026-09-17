@@ -1,0 +1,592 @@
+---
+/**
+ * Issue① のブロック内で使う視覚表現（schema v4 / issueOne.blocks[].visual）
+ *
+ * 汎用コンポーネント。特定カテゴリ・特定商品向けの分岐は持たない。
+ * 「文章を全部読まなくても、そのブロックの要点が目に入る」ことだけを担う。
+ *
+ *   key-benefit … 認められている範囲・含まれるものを並べ、注目してほしい1つを強調する
+ *                 connector を指定すると項目の間に区切り記号（例：＋）を挟み、セットとして見せる
+ *                 項目は1つの枠の中に置く。caption を渡すとその枠が何の範囲かを見出せる
+ *                 （強調した項目も枠・配色の系統は他と同じに保ち、別格に見せない）
+ *   rating      … 公的機関・学会などの評価を、評価者／評価／意味の3点で見せる
+ *   stats       … 少数の数値を対比させる。グラフの前に結果を先に示すときに使う
+ *   comparison-evidence … 何と何を比べた研究か、と報告された結果を文章で見せる。
+ *                 数値・勝敗・強調は持たない（items の value / highlight は描画しない）
+ *   comparison-table … 2つの対象を、同じ比較軸で並べる。表組みではなく左右のカードで描く。
+ *                 制度・区分・条件の違いを事実として並べるためのもの。
+ *                 2枚のカードは枠・背景・影をすべて同一にする。
+ *                 列に強弱を付けない。◯×・順位・勝敗の記号は持たない（highlight を受け取らない）
+ *
+ * 装飾のための画像は持たない。写真・Before/After は扱わない。
+ */
+import InlineText from './InlineText.astro';
+
+export interface IssueOneVisualItem {
+  label: string;
+  /** 補足。1行程度 */
+  value?: string;
+  /** 注目してほしい項目。1つの visual につき1つが原則 */
+  highlight?: boolean;
+}
+
+/** comparison-table の1行。values は columns と同じ件数・同じ順序 */
+export interface IssueOneVisualTableRow {
+  label: string;
+  values: string[];
+}
+
+export interface IssueOneVisualData {
+  type?: 'key-benefit' | 'rating' | 'stats' | 'comparison-evidence' | 'comparison-table';
+  /** key-benefit / stats / comparison-evidence で並べる項目 */
+  items?: IssueOneVisualItem[];
+  /** key-benefit / comparison-evidence：項目の間に挟む区切り記号。例：＋ ／ vs */
+  connector?: string;
+  /** key-benefit：項目を囲む枠が何の範囲かを示す1行。例：承認された効能・効果の範囲 */
+  caption?: string;
+
+  /* comparison-table 用 */
+  /** 比較する対象の名前。2列を想定 */
+  columns?: string[];
+  /** 各対象に添える小ラベル。columns と同じ件数・同じ順序。例：今回紹介する4商品 */
+  columnTags?: string[];
+  /** 比較軸ごとの1行 */
+  rows?: IssueOneVisualTableRow[];
+
+  /* comparison-evidence 用 */
+  /** どんな研究か。例：海外の成人男性を対象とした比較試験 */
+  heading?: string;
+  /** 報告された結果。数値を入れない1文 */
+  finding?: string;
+
+  /* rating 用 */
+  /** 評価した主体。例：日本皮膚科学会 */
+  source?: string;
+  /** 評価の対象。例：5%ミノキシジル外用 */
+  subject?: string;
+  /** 評価の呼び名。例：推奨度 */
+  gradeLabel?: string;
+  /** 評価そのもの。例：A */
+  grade?: string;
+  /** その評価が何を意味するか。例：行うよう強く勧める */
+  meaning?: string;
+
+  /** 共通の補足。1行程度 */
+  note?: string;
+}
+
+interface Props {
+  data?: IssueOneVisualData;
+}
+
+const { data } = Astro.props;
+
+const items = Array.isArray(data?.items)
+  ? data.items.filter((i) => i && typeof i.label === 'string' && i.label.trim() !== '')
+  : [];
+
+const type = data?.type;
+const note = data?.note?.trim();
+
+const grade = data?.grade?.trim();
+const meaning = data?.meaning?.trim();
+const source = data?.source?.trim();
+const subject = data?.subject?.trim();
+const gradeLabel = data?.gradeLabel?.trim();
+
+const connector = data?.connector?.trim();
+const heading = data?.heading?.trim();
+const finding = data?.finding?.trim();
+
+const showKeyBenefit = type === 'key-benefit' && items.length > 0;
+const showStats = type === 'stats' && items.length > 0;
+const showRating = type === 'rating' && Boolean(grade || meaning);
+const showEvidence = type === 'comparison-evidence' && items.length >= 2;
+const evidenceConnector = connector || 'vs';
+
+const caption = data?.caption?.trim();
+
+const columns = Array.isArray(data?.columns)
+  ? data.columns.filter((c) => typeof c === 'string' && c.trim() !== '')
+  : [];
+const columnTags = Array.isArray(data?.columnTags) ? data.columnTags : [];
+const tableRows = Array.isArray(data?.rows)
+  ? data.rows.filter(
+      (r) =>
+        r &&
+        typeof r.label === 'string' &&
+        r.label.trim() !== '' &&
+        Array.isArray(r.values) &&
+        r.values.length === columns.length,
+    )
+  : [];
+const showTable = type === 'comparison-table' && columns.length >= 2 && tableRows.length > 0;
+---
+
+{showKeyBenefit && (
+  <div class="iov iov-benefit">
+    <div class="iov-frame">
+      {caption && <p class="iov-frame-caption">{caption}</p>}
+      <ul class="iov-chips" data-joined={connector ? 'on' : 'off'}>
+        {items.map((item, i) => (
+          <>
+            {connector && i > 0 && (
+              <li class="iov-connector" aria-hidden="true">{connector}</li>
+            )}
+            <li class="iov-chip" data-emphasis={item.highlight === true ? 'on' : 'off'}>
+              <span class="iov-chip-label">{item.label}</span>
+              {item.value && <span class="iov-chip-value">{item.value}</span>}
+            </li>
+          </>
+        ))}
+      </ul>
+      {note && <p class="iov-note"><InlineText text={note} /></p>}
+    </div>
+  </div>
+)}
+
+{showEvidence && (
+  <div class="iov iov-evidence">
+    <div class="iov-evidence-card">
+      {heading && <p class="iov-evidence-heading">{heading}</p>}
+      <ul class="iov-evidence-arms">
+        {items.map((item, i) => (
+          <>
+            {i > 0 && (
+              <li class="iov-evidence-connector" aria-hidden="true">{evidenceConnector}</li>
+            )}
+            <li class="iov-evidence-arm">{item.label}</li>
+          </>
+        ))}
+      </ul>
+      {finding && <p class="iov-evidence-finding"><InlineText text={finding} /></p>}
+    </div>
+    {note && <p class="iov-note"><InlineText text={note} /></p>}
+  </div>
+)}
+
+{showTable && (
+  <div class="iov iov-compare">
+    {caption && <p class="iov-compare-heading">{caption}</p>}
+    <div class="iov-compare-grid">
+      {columns.map((col, ci) => (
+        <div class="iov-compare-card">
+          <div class="iov-compare-card-head">
+            {typeof columnTags[ci] === 'string' && columnTags[ci].trim() !== '' && (
+              <span class="iov-compare-tag">{columnTags[ci]}</span>
+            )}
+            <p class="iov-compare-name">{col}</p>
+          </div>
+          <dl class="iov-compare-list">
+            {tableRows.map((row) => (
+              <div class="iov-compare-row">
+                <dt>{row.label}</dt>
+                <dd><InlineText text={row.values[ci]} /></dd>
+              </div>
+            ))}
+          </dl>
+        </div>
+      ))}
+    </div>
+    {note && <p class="iov-note"><InlineText text={note} /></p>}
+  </div>
+)}
+
+{showRating && (
+  <div class="iov iov-rating">
+    <div class="iov-rating-card">
+      {source && <p class="iov-rating-source">{source}</p>}
+      <p class="iov-rating-grade">
+        {gradeLabel && <span class="iov-rating-grade-label">{gradeLabel}</span>}
+        {grade && <span class="iov-rating-grade-value">{grade}</span>}
+      </p>
+      {meaning && <p class="iov-rating-meaning">{meaning}</p>}
+      {subject && <p class="iov-rating-subject">{subject}</p>}
+    </div>
+    {note && <p class="iov-note"><InlineText text={note} /></p>}
+  </div>
+)}
+
+{showStats && (
+  <div class="iov iov-stats">
+    <ul class="iov-stat-list">
+      {items.map((item) => (
+        <li class="iov-stat" data-emphasis={item.highlight === true ? 'on' : 'off'}>
+          <span class="iov-stat-label">{item.label}</span>
+          {item.value && <span class="iov-stat-value">{item.value}</span>}
+        </li>
+      ))}
+    </ul>
+    {note && <p class="iov-note"><InlineText text={note} /></p>}
+  </div>
+)}
+
+<style>
+  .iov {
+    margin: 1.1rem 0 1.3rem;
+  }
+
+  .iov-note {
+    margin: 0.6rem 0 0;
+    font-size: 0.8rem;
+    line-height: 1.7;
+    color: var(--color-text-muted);
+  }
+
+  /* --- key-benefit ---------------------------------------------------- */
+
+  /* 項目は1つの枠の中に置く。「同じ範囲に入っている」ことを枠で示す */
+  .iov-frame {
+    padding: 1.2rem 1.1rem 1rem;
+    border: 1px solid var(--color-primary-border);
+    border-radius: var(--radius-md);
+    background: var(--color-primary-light);
+  }
+
+  .iov-frame-caption {
+    margin: 0 0 0.9rem;
+    color: var(--color-primary);
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    line-height: 1.6;
+    text-align: center;
+  }
+
+  .iov-frame .iov-note {
+    margin-bottom: 0;
+  }
+
+  .iov-chips {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: stretch;
+    justify-content: center;
+    gap: 0.5rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .iov-chip {
+    display: grid;
+    place-items: center;
+    flex: 1 1 7.5rem;
+    min-height: 3.3rem;
+    gap: 0.15rem;
+    padding: 0.5rem 0.7rem;
+    border: 1px solid var(--color-primary-border);
+    border-radius: var(--radius-sm);
+    background: var(--color-bg);
+    text-align: center;
+  }
+
+  .iov-chip-label {
+    font-size: 0.97rem;
+    font-weight: 700;
+    line-height: 1.5;
+    color: var(--color-text);
+  }
+
+  .iov-chip-value {
+    font-size: 0.78rem;
+    font-weight: 500;
+    line-height: 1.5;
+    color: var(--color-text-muted);
+  }
+
+  /* 強調する項目も、枠・背景の系統は他と同じに保つ。
+     輪郭の太さと文字の大きさだけ一段上げ、別枠の存在に見せない */
+  .iov-chip[data-emphasis='on'] {
+    border-width: 2px;
+    border-color: var(--color-accent);
+    background: var(--color-bg);
+    box-shadow: 0 0 0 4px rgba(21, 127, 116, 0.09);
+  }
+
+  .iov-chip[data-emphasis='on'] .iov-chip-label {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--color-primary-dark);
+  }
+
+  .iov-chip[data-emphasis='on'] .iov-chip-value {
+    color: var(--color-text);
+  }
+
+  .iov-connector {
+    display: grid;
+    place-items: center;
+    flex: none;
+    font-size: 1rem;
+    font-weight: 700;
+    line-height: 1;
+    color: var(--color-accent);
+  }
+
+  /* --- comparison-evidence -------------------------------------------- */
+
+  .iov-evidence-card {
+    padding: 1rem 1.25rem;
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+    background: var(--color-bg-subtle);
+  }
+
+  .iov-evidence-heading {
+    margin: 0 0 0.7rem;
+    font-size: 0.85rem;
+    line-height: 1.6;
+    color: var(--color-text-muted);
+  }
+
+  .iov-evidence-arms {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .iov-evidence-arm {
+    flex: 1 1 9rem;
+    padding: 0.55rem 0.8rem;
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+    background: var(--color-bg, #fff);
+    font-size: 0.95rem;
+    font-weight: 700;
+    line-height: 1.5;
+    text-align: center;
+    color: var(--color-text);
+  }
+
+  .iov-evidence-connector {
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--color-text-muted);
+  }
+
+  .iov-evidence-finding {
+    margin: 0.8rem 0 0;
+    font-size: 0.95rem;
+    line-height: 1.7;
+    color: var(--color-text);
+  }
+
+  /* --- comparison-table（左右の比較カードで描く） ---------------------- */
+
+  .iov-compare-heading {
+    margin: 0 0 0.8rem;
+    color: var(--color-text-muted);
+    font-size: 0.8rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+  }
+
+  .iov-compare-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+    gap: 0.8rem;
+  }
+
+  /* 2枚のカードは同じ枠・同じ背景・同じ影。どちらかを優位に見せる装飾はしない */
+  .iov-compare-card {
+    display: flex;
+    flex-direction: column;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    background: var(--color-bg);
+    box-shadow: var(--shadow-soft);
+    overflow: hidden;
+  }
+
+  .iov-compare-card-head {
+    padding: 0.9rem 1rem;
+    border-bottom: 1px solid var(--color-border-soft);
+    background: var(--color-sand-light);
+  }
+
+  .iov-compare-tag {
+    display: inline-block;
+    margin-bottom: 0.35rem;
+    padding: 0.08rem 0.5rem;
+    border-radius: 999px;
+    border: 1px solid var(--color-sand);
+    background: var(--color-bg);
+    color: var(--color-warn);
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+  }
+
+  .iov-compare-name {
+    margin: 0;
+    font-size: 0.98rem;
+    font-weight: 800;
+    line-height: 1.55;
+    color: var(--color-text);
+  }
+
+  .iov-compare-list {
+    margin: 0;
+    padding: 0.35rem 1rem 0.9rem;
+  }
+
+  .iov-compare-row {
+    padding: 0.7rem 0;
+    border-bottom: 1px dashed var(--color-border);
+  }
+
+  .iov-compare-row:last-child {
+    border-bottom: 0;
+  }
+
+  .iov-compare-row dt {
+    margin-bottom: 0.2rem;
+    color: var(--color-accent);
+    font-size: 0.74rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+  }
+
+  .iov-compare-row dd {
+    margin: 0;
+    font-size: 0.9rem;
+    line-height: 1.8;
+    color: var(--color-text);
+  }
+
+  /* --- rating --------------------------------------------------------- */
+
+  .iov-rating-card {
+    display: inline-block;
+    min-width: min(100%, 17rem);
+    padding: 1rem 1.25rem;
+    border: 2px solid var(--color-primary);
+    border-radius: 8px;
+    background: var(--color-primary-light);
+  }
+
+  .iov-rating-source {
+    margin: 0;
+    font-size: 0.85rem;
+    line-height: 1.5;
+    color: var(--color-primary-dark);
+  }
+
+  .iov-rating-grade {
+    display: flex;
+    align-items: baseline;
+    gap: 0.4rem;
+    margin: 0.2rem 0 0;
+  }
+
+  .iov-rating-grade-label {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--color-primary-dark);
+  }
+
+  .iov-rating-grade-value {
+    font-size: 2.1rem;
+    font-weight: 700;
+    line-height: 1.1;
+    color: var(--color-primary-dark);
+  }
+
+  .iov-rating-meaning {
+    margin: 0.25rem 0 0;
+    font-size: 1.05rem;
+    font-weight: 700;
+    line-height: 1.6;
+    color: var(--color-text);
+  }
+
+  .iov-rating-subject {
+    margin: 0.3rem 0 0;
+    font-size: 0.82rem;
+    line-height: 1.6;
+    color: var(--color-text-muted);
+  }
+
+  /* --- stats ---------------------------------------------------------- */
+
+  .iov-stat-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .iov-stat {
+    display: flex;
+    flex: 1 1 11rem;
+    flex-direction: column;
+    gap: 0.15rem;
+    padding: 0.75rem 1rem;
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+    background: var(--color-bg-subtle);
+  }
+
+  .iov-stat-label {
+    font-size: 0.85rem;
+    line-height: 1.5;
+    color: var(--color-text-muted);
+  }
+
+  .iov-stat-value {
+    font-size: 1.5rem;
+    font-weight: 700;
+    line-height: 1.3;
+    color: var(--color-text);
+  }
+
+  .iov-stat[data-emphasis='on'] {
+    border-color: var(--color-accent);
+    background: var(--color-accent-light);
+  }
+
+  .iov-stat[data-emphasis='on'] .iov-stat-label {
+    font-weight: 700;
+    color: var(--color-text);
+  }
+
+  .iov-stat[data-emphasis='on'] .iov-stat-value {
+    font-size: 1.9rem;
+    color: var(--color-accent);
+  }
+
+  @media (max-width: 480px) {
+    .iov-chip[data-emphasis='on'] .iov-chip-label {
+      font-size: 1.05rem;
+    }
+
+    /* 3項目は横に潰さず縦に積む */
+    .iov-chips {
+      flex-direction: column;
+    }
+
+    .iov-chip {
+      min-height: 0;
+      padding: 0.7rem;
+    }
+
+    .iov-rating-grade-value {
+      font-size: 1.8rem;
+    }
+
+    .iov-stat-value {
+      font-size: 1.35rem;
+    }
+
+    .iov-stat[data-emphasis='on'] .iov-stat-value {
+      font-size: 1.65rem;
+    }
+  }
+</style>

@@ -27,6 +27,7 @@ import RecommendationSummary from '../components/RecommendationSummary.astro';
 import ProductSection from '../components/ProductSection.astro';
 import TableOfContents from '../components/TableOfContents.astro';
 import SourceList from '../components/SourceList.astro';
+import PurchaseNotes from '../components/PurchaseNotes.astro';
 import type { Product } from '../components/ProductCard.astro';
 import type { IssueOneData } from '../components/IssueOneSection.astro';
 import type { Source } from '../components/SourceList.astro';
@@ -34,6 +35,7 @@ import type { TypeGuideItem } from '../components/TypeGuide.astro';
 import type { CategoryDecisionData } from '../components/CategoryDecision.astro';
 import type { DecisionAxisItem } from '../components/DecisionAxes.astro';
 import { SITE_NAME } from '../consts';
+import InlineText from '../components/InlineText.astro';
 
 const { frontmatter } = Astro.props;
 
@@ -70,8 +72,11 @@ const typeGuideNote: string | undefined = frontmatter.typeGuideNote;
 const products: Product[] | undefined = frontmatter.products;
 
 /* --- schema v3 --- */
-// schemaVersion: 3 のときだけ v3 描画。キーが無い既存記事は legacy 描画のまま
-const isV3 = Number(frontmatter.schemaVersion) === 3;
+// schemaVersion 3 以上で構造化描画。キーが無い既存記事は legacy 描画のまま
+const schemaVersion = Number(frontmatter.schemaVersion);
+const isV3 = schemaVersion >= 3;
+// v4：推薦（direction / directReason）を持たない共通フォーマット。v3 記事の描画は変えない
+const isV4 = schemaVersion >= 4;
 const issueOne: IssueOneData | undefined = frontmatter.issueOne;
 const sources: Source[] | undefined = frontmatter.sources;
 /* 記事全体の価格条件を補足する注記。出典の直前に1回だけ置く。
@@ -85,9 +90,35 @@ const conclusionIssue1: string | undefined =
   isV3 && conclusion && !Array.isArray(conclusion)
     ? (conclusion as unknown as { issue1?: string }).issue1
     : undefined;
+/* v3 は「こんな人向け（direction）」付き。v4 は推薦を作らないので direction を渡さない。
+   結論では「この記事で紹介する商品」を並べるだけにする */
 const conclusionRecommendations = isV3 && Array.isArray(products)
-  ? products.map((p) => ({ direction: p.direction, name: p.name, keyPoint: p.keyPoint }))
+  ? products.map((p) => ({
+      ...(isV4 ? {} : { direction: p.direction }),
+      name: p.name,
+      keyPoint: p.keyPoint,
+      /* v4：商品を決めた読者をここで拾う。導線は結論の一覧と商品詳細の2か所だけ。
+         計測用ピクセルは商品ごとに1回なので、ここでは渡さない（ProductSection が描画する） */
+      ...(isV4
+        ? {
+            affiliateUrl: p.affiliateUrl,
+            affiliateLabel: p.affiliateLabel,
+            affiliateProvider: p.affiliateProvider,
+          }
+        : {}),
+    }))
   : [];
+
+/* v4：購入・使用前の注意。商品詳細のあと・出典の前に1回だけ置く。
+   ① の中で安全情報を展開せず、ここへ集約するためのキー */
+const purchaseNotes: string[] | undefined =
+  isV4 && Array.isArray(frontmatter.purchaseNotes) ? frontmatter.purchaseNotes : undefined;
+
+/* v4：比較表の前に置く短い前置き。何が共通で、どこに違いが出るのかを記事側が書く */
+const comparisonLead: string | undefined =
+  isV4 && typeof frontmatter.comparisonLead === 'string' && frontmatter.comparisonLead.trim() !== ''
+    ? frontmatter.comparisonLead.trim()
+    : undefined;
 
 const datePublished = toISODate(frontmatter.datePublished);
 const dateModified = toISODate(frontmatter.dateModified) ?? datePublished;
@@ -146,16 +177,21 @@ const jsonLd = {
           recommendations={conclusionRecommendations}
         />
 
-        <TableOfContents issueOneTitle={issueOne?.title} products={products} />
+        <TableOfContents issueOne={issueOne} issueOneTitle={issueOne?.title} products={products} v4={isV4} />
 
         <IssueOneSection data={issueOne} />
 
-        <RecommendationSummary items={products} />
+        <RecommendationSummary items={products} lead={comparisonLead} v4={isV4} />
 
-        {/* v3 は商品ごとに全幅の独立章。カードグリッドで横並びにしない */}
-        {(products ?? []).map((product, i) => <ProductSection {...product} index={i + 1} />)}
+        {/* v3/v4 とも商品ごとに全幅の独立章。カードグリッドで横並びにしない */}
+        {(products ?? []).map((product, i) => (
+          <ProductSection {...product} index={i + 1} v4={isV4} />
+        ))}
 
-        {priceNote && <p class="article-price-note">{priceNote}</p>}
+        {/* v4：安全情報は本文で展開せず、ここに最小限だけ集約する */}
+        <PurchaseNotes items={purchaseNotes} />
+
+        {priceNote && <p class="article-price-note"><InlineText text={priceNote} /></p>}
 
         <SourceList items={sources} />
 

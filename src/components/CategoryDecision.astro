@@ -1,4 +1,5 @@
 ---
+import InlineText from './InlineText.astro';
 /**
  * カテゴリ検討ブロック（v2 記事順序の 2 番目）
  *
@@ -50,10 +51,10 @@ const hasContent = Boolean(title) && body.length > 0;
     <h2 class="category-decision-title">{title}</h2>
 
     <div class="category-decision-body">
-      {body.map((text) => <p>{text}</p>)}
+      {body.map((text) => <p><InlineText text={text} /></p>)}
     </div>
 
-    {notice && <p class="category-decision-notice">{notice}</p>}
+    {notice && <p class="category-decision-notice"><InlineText text={notice} /></p>}
   </section>
 )}
 

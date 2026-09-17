@@ -1,0 +1,107 @@
+---
+/**
+ * 購入・使用前の最低限の注意（schema v4 / purchaseNotes）
+ *
+ * 安全情報を本文やIssue①の中で展開せず、商品詳細のあとに1箇所だけ置くための枠。
+ * 治療管理・服薬指導の解説は記事の目的ではないため、ここは「購入前に確認すべき点」の
+ * 短い箇条書きに限る。詳細な疾患名・副作用一覧・発現率は書かない（記事側の責務）。
+ *
+ * 値が無ければ何も描画しない。v3 以前の記事は purchaseNotes を持たないため表示は変わらない。
+ */
+import InlineText from './InlineText.astro';
+
+interface Props {
+  /** 記事 frontmatter の purchaseNotes。空・未指定なら何も描画しない */
+  items?: string[];
+  /** 見出し文言。通常は変えない */
+  heading?: string;
+}
+
+const { items = [], heading = '購入・使用前に確認' } = Astro.props;
+
+const lines = Array.isArray(items)
+  ? items.filter((t) => typeof t === 'string' && t.trim() !== '')
+  : [];
+---
+
+{lines.length > 0 && (
+  <aside class="purchase-notes" id="purchase-notes" aria-label={heading}>
+    <p class="purchase-notes-title">
+      <span class="purchase-notes-icon" aria-hidden="true">!</span>
+      {heading}
+    </p>
+    <ul>
+      {lines.map((line) => <li><InlineText text={line} /></li>)}
+    </ul>
+  </aside>
+)}
+
+<style>
+  /* 色は global.css の :root 変数だけを使う。生の色コードは書かない。
+     注意は読み飛ばされては困るため、本文と同程度の文字サイズを保つ。
+     強い警告色ではなく淡い暖色で、トーンだけ穏やかにする */
+  .purchase-notes {
+    margin: 3rem 0;
+    padding: 1.5rem 1.5rem 1.3rem;
+    background: var(--color-warn-light);
+    border: 1px solid var(--color-warn-border);
+    border-radius: var(--radius-lg);
+    line-height: 1.85;
+  }
+
+  .purchase-notes-title {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    margin: 0 0 1rem;
+    font-size: 1.05rem;
+    font-weight: 800;
+    color: var(--color-warn);
+  }
+
+  .purchase-notes-icon {
+    display: grid;
+    place-items: center;
+    flex: none;
+    width: 1.6rem;
+    height: 1.6rem;
+    border-radius: 50%;
+    background: var(--color-warn);
+    color: var(--color-warn-light);
+    font-size: 0.9rem;
+    font-weight: 800;
+    line-height: 1;
+  }
+
+  .purchase-notes ul {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .purchase-notes li {
+    position: relative;
+    margin: 0;
+    padding: 0.55rem 0 0.55rem 1.15rem;
+    border-bottom: 1px dashed var(--color-warn-border);
+    font-size: 0.92rem;
+  }
+
+  .purchase-notes li::before {
+    position: absolute;
+    top: 0.55rem;
+    left: 0;
+    color: var(--color-warn);
+    content: '・';
+  }
+
+  .purchase-notes li:last-child {
+    border-bottom: 0;
+  }
+
+  @media (max-width: 560px) {
+    .purchase-notes {
+      padding: 1.25rem 1.15rem 1.1rem;
+    }
+  }
+</style>

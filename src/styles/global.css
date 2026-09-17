@@ -9,25 +9,45 @@
    色はここだけで管理する。個別の指定に生の色コードを書かない。
    ------------------------------------------------------------- */
 :root {
-  /* ベース */
+  /* ベース
+     ページ地は白。温かみは背景色ではなく、角丸・余白・影・要点の淡色で作る */
   --color-bg: #ffffff;
-  --color-bg-subtle: #f7fafc; /* 表の交互行、囲みの背景 */
-  --color-text: #1a2b3c; /* 本文。黒ではなく濃紺寄り */
-  --color-text-muted: #5a6b7c; /* 注記、日付、出典 */
-  --color-border: #d8e2ea;
+  --color-bg-subtle: #f7f7f5; /* 画像を置く窪み、表の交互行 */
+  --color-text: #273130; /* 本文。黒ではなく中性寄りの暗色 */
+  --color-text-muted: #5f6b68; /* 注記、日付、出典 */
+  --color-text-faint: #8e9895; /* メーカー名など、補足の補足 */
+  --color-border: #dededa; /* カードの輪郭。影に頼りきらず、境目が分かる程度まで */
+  --color-border-soft: #eeeeea;
 
-  /* メイン：青（信頼・中立）＝ 構造に使う */
-  --color-primary: #1668c1;
-  --color-primary-dark: #0f4c8f;
-  --color-primary-light: #e8f2fc; /* 見出し背景、表ヘッダー */
+  /* メイン：深い青緑（信頼・中立）＝ 見出し・ラベル・重要語・導線に限定して使う */
+  --color-primary: #10605a;
+  --color-primary-dark: #0a3e3a;
+  --color-primary-light: #edf5f4; /* ラベル背景、囲みの背景 */
+  --color-primary-border: #d5e8e4; /* 淡い囲みの輪郭 */
 
-  /* アクセント：緑（明るさ）＝ 補足・ポイントに使う */
-  --color-accent: #0f9b73;
-  --color-accent-light: #e6f6f1;
+  /* アクセント：やや明るい青緑＝ 小ラベル・区切り */
+  --color-accent: #157f74;
+  --color-accent-light: #edf5f4;
 
-  /* 注意喚起＝ オレンジ。注意以外には使わない */
-  --color-warn: #c9761a;
-  --color-warn-light: #fdf3e7;
+  /* 補助：淡いベージュ＝ 要点ボックス、チップ。ページ全体には敷かない */
+  --color-sand: #ecdfc9;
+  --color-sand-light: #fbf6ed;
+
+  /* 注意喚起＝ 淡い暖色。注意以外には使わない */
+  --color-warn: #8a5a1f;
+  --color-warn-light: #fdf4e6;
+  --color-warn-border: #f2e0c2;
+
+  /* 形 */
+  --radius-lg: 18px;
+  --radius-md: 12px;
+  --radius-sm: 8px;
+
+  /* 影：白地の上で「紙が少し浮いて見える」程度。黒く重い単発の影にしない */
+  --shadow-card: 0 1px 1px rgba(23, 26, 25, 0.025), 0 3px 6px rgba(23, 26, 25, 0.035),
+    0 12px 26px -12px rgba(23, 26, 25, 0.09);
+  --shadow-soft: 0 1px 1px rgba(23, 26, 25, 0.02), 0 2px 5px rgba(23, 26, 25, 0.03),
+    0 8px 18px -10px rgba(23, 26, 25, 0.07);
 }
 
 /* -------------------------------------------------------------
@@ -78,38 +98,36 @@ img {
 
 /* -------------------------------------------------------------
    3. 見出し
-   h2 の背景色ブロックが、このサイトの視認性の要。
+   白地の上に文字だけで階層を作る。塗りブロック・太い罫線は使わない。
+   面で区切るのはカード（各コンポーネント）の役割。
    ------------------------------------------------------------- */
 h1 {
-  font-size: 1.75rem;
+  font-size: clamp(1.5rem, 5.2vw, 2rem);
   line-height: 1.5;
-  font-weight: 700;
+  font-weight: 800;
   margin-top: 0;
-  margin-bottom: 1.5rem;
-  padding-bottom: 0.75rem;
-  border-bottom: 3px solid var(--color-primary);
+  margin-bottom: 1.25rem;
+  color: var(--color-primary-dark);
 }
 
 h2 {
-  font-size: 1.35rem;
-  line-height: 1.6;
-  font-weight: 700;
+  font-size: clamp(1.2rem, 4.2vw, 1.45rem);
+  line-height: 1.55;
+  font-weight: 800;
   margin-top: 3rem;
   margin-bottom: 1.25rem;
-  padding: 0.6rem 0.9rem;
-  background: var(--color-primary-light);
-  border-left: 5px solid var(--color-primary);
-  border-radius: 4px;
+  color: var(--color-primary-dark);
 }
 
 h3 {
   font-size: 1.1rem;
   line-height: 1.6;
-  font-weight: 700;
+  font-weight: 800;
   margin-top: 2rem;
-  margin-bottom: 0.75rem;
-  padding-left: 0.7rem;
+  margin-bottom: 0.85rem;
+  padding-left: 0.85rem;
   border-left: 4px solid var(--color-accent);
+  color: var(--color-primary-dark);
 }
 
 /* -------------------------------------------------------------

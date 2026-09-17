@@ -19,6 +19,12 @@ export interface DataComparisonRow {
   label: string;
   actual: number;
   references?: DataComparisonReference[];
+  /**
+   * その記事で読者に注目してほしい行。true の行だけ色と数値を強め、
+   * 同じグループの他の行を控えめにする（比較関係は残す）。
+   * 記事側が指定しなければ表示は従来どおり変わらない。
+   */
+  highlight?: boolean;
 }
 
 export interface DataComparisonGroup {
@@ -96,26 +102,37 @@ const refLabelsOf = (group: DataComparisonGroup): string[] => {
 
     {groups.map((group) => {
       const refLabels = refLabelsOf(group);
+      // 記事が highlight を指定したグループだけ、強弱をつける。
+      // 指定が無ければ dimmed も付かず、従来と同じ見た目になる
+      const hasHighlight = group.rows.some((r) => r?.highlight === true);
       return (
         <div class="dc-group">
           {group.label && <p class="dc-group-label">{group.label}</p>}
 
-          <ul class="dc-legend">
-            <li>
-              <span class="dc-key dc-key-bar" aria-hidden="true"></span>
-              {actualLabel}
-            </li>
-            {refLabels.map((label, i) => (
+          {/* 凡例は系列が2つ以上あるときだけ出す。
+              基準マーカーの無い単系列（棒を並べて差そのものを見せる形）では、
+              凡例が1行あっても読者に情報を足さない */}
+          {refLabels.length > 0 && (
+            <ul class="dc-legend">
               <li>
-                <span class="dc-key dc-key-ref" data-ref={i % 3} aria-hidden="true"></span>
-                {label}
+                <span class="dc-key dc-key-bar" aria-hidden="true"></span>
+                {actualLabel}
               </li>
-            ))}
-          </ul>
+              {refLabels.map((label, i) => (
+                <li>
+                  <span class="dc-key dc-key-ref" data-ref={i % 3} aria-hidden="true"></span>
+                  {label}
+                </li>
+              ))}
+            </ul>
+          )}
 
           <div class="dc-rows">
             {group.rows.map((row) => (
-              <div class="dc-row">
+              <div
+                class="dc-row"
+                data-emphasis={hasHighlight ? (row.highlight === true ? 'on' : 'off') : undefined}
+              >
                 <span class="dc-row-label">{row.label}</span>
                 <div class="dc-track">
                   <div class="dc-bar" style={`width:${pct(row.actual)}%`}>
@@ -271,6 +288,36 @@ const refLabelsOf = (group: DataComparisonGroup): string[] => {
     line-height: 1;
     color: #ffffff;
     white-space: nowrap;
+  }
+
+  /* 注目行の強調。記事が highlight を指定したグループにだけ data-emphasis が付く。
+     指定が無い記事では以下のルールが一切当たらず、表示は変わらない */
+  .dc-row[data-emphasis='on'] .dc-row-label {
+    font-weight: 700;
+    color: var(--color-text);
+  }
+
+  .dc-row[data-emphasis='on'] .dc-track {
+    height: 28px;
+  }
+
+  .dc-row[data-emphasis='on'] .dc-bar {
+    background: var(--color-accent);
+    box-shadow: 0 1px 4px rgba(15, 155, 115, 0.35);
+  }
+
+  .dc-row[data-emphasis='on'] .dc-bar-value {
+    font-size: 0.86rem;
+    font-weight: 700;
+  }
+
+  /* 比較対象は消さず、控えめにして関係だけ残す */
+  .dc-row[data-emphasis='off'] .dc-bar {
+    background: #aebecd;
+  }
+
+  .dc-row[data-emphasis='off'] .dc-row-label {
+    color: var(--color-text-muted);
   }
 
   .dc-mark {

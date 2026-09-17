@@ -1,0 +1,122 @@
+---
+/**
+ * 販売ページへの導線（アフィリエイトリンク）
+ *
+ * 汎用コンポーネント。特定 ASP・特定モールのための分岐や文言を持たない。
+ * リンク先の価格・在庫は変動するため、**ここに価格・在庫・期限を表示しない。**
+ * 煽り表現（最安・今だけ・残り○個・SALE）も持たない。
+ *
+ * 計測用ピクセルはここでは描画しない（同じ商品で CTA を複数置いても
+ * ピクセルが重複しないよう、商品ごとに1回だけ別の場所で描画する）。
+ */
+
+interface Props {
+  /** 遷移先。ASP が発行した URL をそのまま渡す（短縮・再生成・パラメータ変更はしない） */
+  url?: string;
+  /** ボタン文言。記事側が渡す */
+  label?: string;
+  /** どの経路の導線か。計測用の目印として data 属性に出すだけで、見た目は変えない */
+  provider?: string;
+  /** full：商品詳細用の通常サイズ ／ compact：一覧用の小さめ */
+  variant?: 'full' | 'compact';
+  /** 同じ文言のリンクが並ぶ場所で、どの商品のリンクかを読み上げさせるための補足 */
+  ariaLabel?: string;
+}
+
+const { url, label, provider, variant = 'full', ariaLabel } = Astro.props;
+
+const href = typeof url === 'string' ? url.trim() : '';
+const text = (typeof label === 'string' ? label.trim() : '') || '販売ページを見る';
+const show = href !== '';
+---
+
+{show && (
+  <a
+    class="acta"
+    data-variant={variant}
+    data-provider={provider}
+    href={href}
+    target="_blank"
+    rel="nofollow sponsored noopener noreferrer"
+    aria-label={ariaLabel}
+  >
+    <span class="acta-label">{text}</span>
+    {/* 外部サイトへ移動することが文言だけに頼らず分かるようにする */}
+    <svg class="acta-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+      <path
+        d="M6.5 3.5H3.2A1.2 1.2 0 0 0 2 4.7v8.1A1.2 1.2 0 0 0 3.2 14h8.1a1.2 1.2 0 0 0 1.2-1.2V9.5"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.6"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      />
+      <path
+        d="M9.5 2h4.5v4.5M13.6 2.4L7.8 8.2"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.6"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      />
+    </svg>
+  </a>
+)}
+
+<style>
+  .acta {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.45rem;
+    max-width: 100%;
+    text-align: center;
+    text-decoration: none;
+    background: var(--color-primary);
+    color: #ffffff;
+    border: 1px solid var(--color-primary);
+    border-radius: 6px;
+    font-weight: 700;
+    line-height: 1.5;
+    transition: background 0.15s ease;
+  }
+
+  .acta:hover,
+  .acta:focus-visible {
+    background: var(--color-primary-dark);
+    border-color: var(--color-primary-dark);
+    color: #ffffff;
+    text-decoration: none;
+  }
+
+  .acta-icon {
+    flex: none;
+    width: 1em;
+    height: 1em;
+  }
+
+  /* 商品詳細：説明を読み終えた位置に置く通常サイズ */
+  .acta[data-variant='full'] {
+    min-height: 48px;
+    padding: 0.7rem 1.4rem;
+    font-size: 1rem;
+  }
+
+  /* 一覧：商品名のすぐ下に置く小さめ。スマホでも押せる高さは確保する */
+  .acta[data-variant='compact'] {
+    min-height: 40px;
+    padding: 0.45rem 0.9rem;
+    font-size: 0.88rem;
+  }
+
+  @media (max-width: 480px) {
+    .acta[data-variant='full'] {
+      display: flex;
+      width: 100%;
+    }
+
+    .acta[data-variant='compact'] {
+      min-height: 44px;
+    }
+  }
+</style>

@@ -1,0 +1,96 @@
+---
+/**
+ * 記事の大きな章の見出し（Issue① / Issue② など）
+ *
+ * 通し番号（01 / 02）＋小ラベル＋見出しの3点で、章の切り替わりを一目で分かるようにする。
+ * 白地の上にそのまま置く要素であり、カードにはしない。
+ *
+ * 番号・小ラベルは記事の内容ではなく**記事構造**を指すため、呼び出し側（各セクションの
+ * コンポーネント）が渡す。記事 frontmatter からは受け取らない。
+ * 見出し文言だけは記事側が決める（issueOne.title など）。
+ *
+ * 値が無ければその部分を描画しない。number が無ければ番号バッジは出ない。
+ */
+
+interface Props {
+  /** 章の通し番号。例：'01'。記事構造から決まる値で、記事内容ではない */
+  number?: string;
+  /** 章の性質を示す小ラベル。例：'このカテゴリについて' */
+  eyebrow?: string;
+  /** 見出し。記事側が決める文言 */
+  title?: string;
+  /** 見出しに付ける id（目次のアンカー用） */
+  titleId?: string;
+}
+
+const { number, eyebrow, title, titleId } = Astro.props;
+
+const num = typeof number === 'string' ? number.trim() : '';
+const eyebrowText = typeof eyebrow === 'string' ? eyebrow.trim() : '';
+const titleText = typeof title === 'string' ? title.trim() : '';
+---
+
+{(num || eyebrowText || titleText) && (
+  <div class="section-header">
+    {num && <span class="section-header-num" aria-hidden="true">{num}</span>}
+    <div class="section-header-body">
+      {eyebrowText && <p class="section-header-eyebrow">{eyebrowText}</p>}
+      {titleText && <h2 class="section-header-title" id={titleId}>{titleText}</h2>}
+    </div>
+  </div>
+)}
+
+<style>
+  .section-header {
+    display: flex;
+    align-items: center;
+    gap: 0.95rem;
+    margin: 0 0 1.35rem;
+  }
+
+  .section-header-num {
+    display: grid;
+    place-items: center;
+    flex: none;
+    width: 3rem;
+    height: 3rem;
+    border-radius: var(--radius-md);
+    background: var(--color-primary);
+    color: #fff;
+    font-size: 1.15rem;
+    font-weight: 800;
+    letter-spacing: 0.02em;
+    line-height: 1;
+    box-shadow: 0 6px 14px -8px rgba(10, 62, 58, 0.55);
+  }
+
+  .section-header-eyebrow {
+    margin: 0 0 0.1rem;
+    color: var(--color-accent);
+    font-size: 0.76rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    line-height: 1.6;
+  }
+
+  /* global.css の h2 の上下マージンを打ち消す。余白は .section-header が持つ */
+  .section-header-title {
+    margin: 0;
+    font-size: clamp(1.2rem, 4.2vw, 1.45rem);
+    font-weight: 800;
+    line-height: 1.55;
+    color: var(--color-primary-dark);
+  }
+
+  @media (max-width: 560px) {
+    .section-header {
+      gap: 0.75rem;
+    }
+
+    .section-header-num {
+      width: 2.6rem;
+      height: 2.6rem;
+      font-size: 1rem;
+    }
+  }
+</style>

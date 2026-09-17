@@ -1,88 +1,454 @@
 ---
 /**
- * Issue 1「どんな人がこのカテゴリを検討すべきか」（schema v3 / issueOne）
+ * Issue 1「このカテゴリの商品を、自分は買うべきか」への回答（schema v3 / issueOne）
  *
  * article-planner の §9-0 が決めた材料だけを描画する。
- * 描画順：supplementalFacts → supportingFacts → dataComparison
- *         → considerationGroups → medicalBoundary
+ * 見出しは記事ごとに writer が決める（issueOne.title）。表示層は固定見出しを持たない。
+ *
+ * 描画順：blocks（または supportingFacts）→ dataComparison → whoShouldBuy → medicalBoundary
+ *
+ * blocks は①を意味のまとまりごとに分けて読ませるための構造。
+ * blocks を持つ記事では supportingFacts を描画しない（同じ内容が二度出る事故を防ぐ）。
  *
  * 値が無い部分は描画しない。カードの羅列にせず、1つのセクションとして読めることを優先する。
  */
 import DataComparison from './DataComparison.astro';
 import type { DataComparisonData } from './DataComparison.astro';
+import IssueOneVisual from './IssueOneVisual.astro';
+import type { IssueOneVisualData } from './IssueOneVisual.astro';
+import InlineText from './InlineText.astro';
+import SectionHeader from './SectionHeader.astro';
+import KeyPoint from './KeyPoint.astro';
+
+/**
+ * ①を意味のまとまりごとに分けた1ブロック。
+ * 小見出し＋そのブロックで伝える1つのメッセージ＋必要なら視覚表現で構成する。
+ * ブロック内の描画順：title → visual → paragraphs → dataComparison
+ */
+export interface IssueOneBlock {
+  title?: string;
+  paragraphs?: string[];
+  visual?: IssueOneVisualData | null;
+  dataComparison?: DataComparisonData | null;
+  /**
+   * そのブロックで最も読ませたい一文。淡色の大きめボックスで見せる。
+   * 文字列だけ渡せばラベルは既定値。ラベルを変える場合は { label, text }。
+   * 未指定ならボックスそのものを描画しない（既存記事の表示は変わらない）。
+   */
+  keyPoint?: string | { label?: string; text: string } | null;
+  /**
+   * 表示の種類。'summary' を渡すと章の結論用カード（淡色）で描画する。
+   * 未指定なら通常ブロック。事実・文言の意味は変えない、表示層だけの指定。
+   */
+  variant?: 'default' | 'summary';
+  /**
+   * 見出し付きの短い箇条書き。使用できない人・相談が必要な人のような、
+   * 条件を1件ずつ縦に読ませたいときに使う。段落の後に描画する。
+   */
+  lists?: { title?: string; items?: string[] }[];
+  /**
+   * 言葉とその意味の対応を横に並べて見せるまとまり。
+   * 語の意味を一目で見比べさせるためのもので、視覚表現（visual）の前に描画する。
+   * 語の優劣・程度差を作る用途では使わない（並べるだけ）。
+   */
+  terms?: { title?: string; items?: { term?: string; meaning?: string }[] } | null;
+  /**
+   * ブロック内の描画順。記事ごとに読ませたい順序が違うため、記事側で指定できる。
+   * 未指定なら既定の順序（keyPoint → terms → visual → paragraphs → lists → dataComparison）。
+   * 並べ替えるだけで、内容・デザインは変えない。既存記事は未指定なので表示は変わらない。
+   */
+  order?: ('keyPoint' | 'terms' | 'visual' | 'paragraphs' | 'lists' | 'dataComparison')[];
+  /**
+   * variant: 'summary' のとき、同じカードの中に続けて置く次の見出しと一文。
+   * 章の結論から次の章へ渡すためのもの。
+   */
+  next?: { title?: string; text?: string } | null;
+}
 
 export interface IssueOneData {
   title?: string;
-  supplementalFacts?: string[];
+  /** 買う価値がある人／買わなくてよい人。planner が渡した側だけでよい */
+  whoShouldBuy?: string[];
+  /** ①を小見出し単位に分けて書く場合。blocks があるとき supportingFacts は描画しない */
+  blocks?: IssueOneBlock[];
   supportingFacts?: string[];
-  considerationGroups?: string[];
   medicalBoundary?: string;
   dataComparison?: DataComparisonData | null;
+
+  /* --- temporary compatibility ------------------------------------------
+     公開中の旧 v3 記事を再生成するまでの一時措置。旧契約のキーであり、
+     新規記事では使わない（health-affiliate 側の validator が新しい draft の
+     旧キーを E-FM-LEGACY-KEY で FAIL させる）。
+     公開中の記事を書き直した時点で、この2つと下の fallback は削除してよい。 */
+  /** @deprecated 旧 considerationGroups。現行は whoShouldBuy */
+  considerationGroups?: string[];
+  /** @deprecated 旧 supplementalFacts。現行は supportingFacts に一本化 */
+  supplementalFacts?: string[];
 }
 
 interface Props {
   /** 記事 frontmatter の issueOne。空・未指定なら何も描画しない */
   data?: IssueOneData;
-  /** considerationGroups の前に置く小見出し。記事側で上書きできる */
-  groupsHeading?: string;
 }
 
-const { data, groupsHeading = 'こんな方は意識したい' } = Astro.props;
+/**
+ * このセクションを描画するか。
+ * TableOfContents.astro が #issue-one を出すかの判定にも同じ関数を使う（死んだアンカーを作らない）。
+ * export した関数はモジュール直下へ持ち上がるため、コンポーネント側の変数を参照しない。
+ */
+export function hasIssueOneContent(data?: IssueOneData): boolean {
+  const hasText = (list?: string[]) =>
+    Array.isArray(list) && list.some((t) => typeof t === 'string' && t.trim() !== '');
+  const hasBlocks =
+    Array.isArray(data?.blocks) &&
+    data.blocks.some(
+      (b) =>
+        b &&
+        (Boolean(b.title?.trim()) || hasText(b.paragraphs) || Boolean(b.visual) || Boolean(b.dataComparison)),
+    );
+  return (
+    hasBlocks ||
+    hasText(data?.whoShouldBuy) ||
+    hasText(data?.supportingFacts) ||
+    Boolean(data?.medicalBoundary?.trim()) ||
+    Boolean(data?.dataComparison) ||
+    // temporary compatibility：公開中の旧 v3 記事
+    hasText(data?.considerationGroups) ||
+    hasText(data?.supplementalFacts)
+  );
+}
+
+const { data } = Astro.props;
+
+/** ブロック内の既定の描画順。記事が order を指定しなければこの順になる */
+const DEFAULT_BLOCK_ORDER = [
+  'keyPoint',
+  'terms',
+  'visual',
+  'paragraphs',
+  'lists',
+  'dataComparison',
+] as const;
 
 const clean = (list?: string[]) =>
   Array.isArray(list) ? list.filter((t) => typeof t === 'string' && t.trim() !== '') : [];
 
 const title = data?.title?.trim();
-const supplementalFacts = clean(data?.supplementalFacts);
-const supportingFacts = clean(data?.supportingFacts);
-const considerationGroups = clean(data?.considerationGroups);
+
+// blocks が正本。持つ記事では supportingFacts を描画しない
+const blocks = Array.isArray(data?.blocks)
+  ? data.blocks.filter(
+      (b) =>
+        b &&
+        (Boolean(b.title?.trim()) ||
+          clean(b.paragraphs).length > 0 ||
+          Boolean(b.visual) ||
+          Boolean(b.dataComparison)),
+    )
+  : [];
+const supportingFacts = blocks.length > 0 ? [] : clean(data?.supportingFacts);
 const medicalBoundary = data?.medicalBoundary?.trim();
 const dataComparison = data?.dataComparison ?? undefined;
 
-const hasContent =
-  supplementalFacts.length > 0 ||
-  supportingFacts.length > 0 ||
-  considerationGroups.length > 0 ||
-  Boolean(medicalBoundary) ||
-  Boolean(dataComparison);
+// whoShouldBuy が正本。持たない記事のときだけ旧 considerationGroups を読む（temporary compatibility）
+const whoShouldBuyPrimary = clean(data?.whoShouldBuy);
+const whoShouldBuy =
+  whoShouldBuyPrimary.length > 0 ? whoShouldBuyPrimary : clean(data?.considerationGroups);
+// 旧 v3 記事だけが持つ補足。新規記事では常に空（temporary compatibility）
+const supplementalFacts = clean(data?.supplementalFacts);
+
+const hasContent = hasIssueOneContent(data);
 ---
 
 {hasContent && (
-  <section class="issue-one" id="issue-one" aria-label={title ?? 'このカテゴリを検討すべき人'}>
-    {title && <h2 class="issue-one-title">{title}</h2>}
+  <section class="issue-one" id="issue-one" aria-label={title}>
+    {/* 番号・小ラベルは記事構造から決まる値。記事 frontmatter からは受け取らない */}
+    <SectionHeader number="01" eyebrow="このカテゴリについて" title={title} />
 
-    {supplementalFacts.map((text) => <p class="issue-one-text">{text}</p>)}
+    {/* temporary compatibility：旧 v3 記事の supplementalFacts。新規記事では空 */}
+    {supplementalFacts.map((text) => <p class="issue-one-text"><InlineText text={text} /></p>)}
 
-    {supportingFacts.map((text) => <p class="issue-one-text">{text}</p>)}
+    {blocks.map((block) => (
+      block.variant === 'summary' ? (
+        /* 章の結論から次の章へ渡すカード。文言は記事側のもの */
+        <aside class="issue-one-summary" aria-label={block.title?.trim()}>
+          {block.title?.trim() && <p class="issue-one-summary-label">{block.title}</p>}
+          {clean(block.paragraphs).map((text) => (
+            <p class="issue-one-summary-text"><InlineText text={text} /></p>
+          ))}
+          {block.next && (block.next.title?.trim() || block.next.text?.trim()) && (
+            <div class="issue-one-summary-next">
+              {block.next.title?.trim() && (
+                <p class="issue-one-summary-next-title">{block.next.title}</p>
+              )}
+              {block.next.text?.trim() && (
+                <p class="issue-one-summary-next-text"><InlineText text={block.next.text} /></p>
+              )}
+            </div>
+          )}
+        </aside>
+      ) : (
+        <div class="issue-one-block">
+          {block.title?.trim() && <h3 class="issue-one-block-title">{block.title}</h3>}
+
+          {(Array.isArray(block.order) && block.order.length > 0
+            ? block.order
+            : DEFAULT_BLOCK_ORDER
+          ).map((part) => (
+            <>
+              {part === 'keyPoint' && <KeyPoint data={block.keyPoint ?? undefined} />}
+
+              {part === 'terms' &&
+                block.terms &&
+                (block.terms.items ?? []).some((t) => t?.term?.trim()) && (
+                  <div class="issue-one-terms">
+                    {block.terms.title?.trim() && (
+                      <p class="issue-one-terms-title">{block.terms.title}</p>
+                    )}
+                    <dl class="issue-one-terms-grid">
+                      {(block.terms.items ?? [])
+                        .filter((t) => t?.term?.trim())
+                        .map((t) => (
+                          <div class="issue-one-term">
+                            <dt>{t.term}</dt>
+                            {t.meaning?.trim() && <dd><InlineText text={t.meaning} /></dd>}
+                          </div>
+                        ))}
+                    </dl>
+                  </div>
+                )}
+
+              {part === 'visual' && <IssueOneVisual data={block.visual ?? undefined} />}
+
+              {part === 'paragraphs' &&
+                clean(block.paragraphs).map((text) => (
+                  <p class="issue-one-text"><InlineText text={text} /></p>
+                ))}
+
+              {part === 'lists' &&
+                (block.lists ?? []).map((list) => (
+                  clean(list?.items).length > 0 && (
+                    <div class="issue-one-list">
+                      {list.title?.trim() && <p class="issue-one-list-title">{list.title}</p>}
+                      <ul>
+                        {clean(list.items).map((item) => <li><InlineText text={item} /></li>)}
+                      </ul>
+                    </div>
+                  )
+                ))}
+
+              {part === 'dataComparison' && (
+                <DataComparison data={block.dataComparison ?? undefined} />
+              )}
+            </>
+          ))}
+        </div>
+      )
+    ))}
+
+    {supportingFacts.map((text) => <p class="issue-one-text"><InlineText text={text} /></p>)}
 
     <DataComparison data={dataComparison} />
 
-    {considerationGroups.length > 0 && (
+    {/* 固定サブ見出しは置かない。誰に向くかは whoShouldBuy の文言自体が語る */}
+    {whoShouldBuy.length > 0 && (
       <div class="issue-one-groups">
-        <p class="issue-one-groups-heading">{groupsHeading}</p>
         <ul>
-          {considerationGroups.map((text) => <li>{text}</li>)}
+          {whoShouldBuy.map((text) => <li><InlineText text={text} /></li>)}
         </ul>
       </div>
     )}
 
-    {medicalBoundary && <p class="issue-one-boundary">{medicalBoundary}</p>}
+    {medicalBoundary && <p class="issue-one-boundary"><InlineText text={medicalBoundary} /></p>}
   </section>
 )}
 
 <style>
   .issue-one {
-    margin: 0 0 2.5rem;
+    margin: 0 0 3.6rem;
     scroll-margin-top: 1.5rem;
   }
 
-  .issue-one-title {
-    margin: 0 0 1rem;
+  .issue-one-text {
+    margin: 0 0 1.15rem;
+    line-height: 1.9;
   }
 
-  .issue-one-text {
-    margin: 0 0 1rem;
-    line-height: 1.9;
+  /* 主要ブロックは白カードとして軽く浮かせる。地の白との差は border と影で作る */
+  .issue-one-block {
+    padding: 1.7rem 1.6rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    background: var(--color-bg);
+    box-shadow: var(--shadow-card);
+  }
+
+  .issue-one-block + .issue-one-block {
+    margin-top: 1.5rem;
+  }
+
+  .issue-one-block-title {
+    margin: 0 0 1.15rem;
+    padding-left: 0.85rem;
+    border-left: 4px solid var(--color-accent);
+    font-size: 1.1rem;
+    font-weight: 800;
+    line-height: 1.6;
+    color: var(--color-primary-dark);
+  }
+
+  .issue-one-block :last-child {
+    margin-bottom: 0;
+  }
+
+  /* 章の結論から次の章へ渡すカード。
+     ベタ塗りにせず、既存の淡色（--color-primary-light）を使って
+     本文との区切りだけを作る。文字は本文と同じ濃度を保つ */
+  .issue-one-summary {
+    margin-top: 1.5rem;
+    padding: 1.5rem 1.6rem 1.35rem;
+    border: 1px solid var(--color-primary-border);
+    border-radius: var(--radius-lg);
+    background: var(--color-primary-light);
+    box-shadow: var(--shadow-soft);
+  }
+
+  .issue-one-summary-label {
+    display: inline-block;
+    margin: 0 0 0.7rem;
+    padding: 0.28rem 0.8rem;
+    border-radius: 999px;
+    background: var(--color-primary);
+    color: #fff;
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.07em;
+  }
+
+  .issue-one-summary-text {
+    margin: 0 0 0.9rem;
+    font-size: 1.04rem;
+    font-weight: 600;
+    line-height: 1.95;
+    color: var(--color-text);
+  }
+
+  .issue-one-summary-text:last-child {
+    margin-bottom: 0;
+  }
+
+  /* 次の章へ渡す部分。同じカードの中で、線で区切って見出しを立てる */
+  .issue-one-summary-next {
+    margin-top: 1.1rem;
+    padding-top: 1rem;
+    border-top: 1px dashed var(--color-primary-border);
+  }
+
+  .issue-one-summary-next-title {
+    margin: 0 0 0.3rem;
+    font-size: 1rem;
+    font-weight: 800;
+    line-height: 1.6;
+    color: var(--color-primary-dark);
+  }
+
+  .issue-one-summary-next-text {
+    margin: 0;
+    font-size: 0.97rem;
+    line-height: 1.85;
+    color: var(--color-text);
+  }
+
+  /* 言葉と意味の対応。3語程度を横に並べて見比べさせる。
+     枠は既存の淡いグリーン（--color-primary-light）を使い、ベタ塗りにしない。
+     どの語も同じ枠・同じ文字の強さで並べる（語の間に強弱を作らない） */
+  .issue-one-terms {
+    margin: 1.35rem 0;
+    padding: 1.15rem 1.1rem 1rem;
+    border: 1px solid var(--color-primary-border);
+    border-radius: var(--radius-md);
+    background: var(--color-primary-light);
+  }
+
+  .issue-one-terms-title {
+    margin: 0 0 0.9rem;
+    font-size: 0.97rem;
+    font-weight: 800;
+    line-height: 1.6;
+    color: var(--color-primary-dark);
+  }
+
+  .issue-one-terms-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+    gap: 0.6rem;
+    margin: 0;
+    padding: 0;
+  }
+
+  .issue-one-term {
+    padding: 0.8rem 0.9rem;
+    border: 1px solid var(--color-primary-border);
+    border-radius: var(--radius-sm);
+    background: var(--color-bg);
+  }
+
+  .issue-one-term dt {
+    margin-bottom: 0.3rem;
+    padding-bottom: 0.3rem;
+    border-bottom: 1px solid var(--color-border-soft);
+    font-size: 1rem;
+    font-weight: 800;
+    line-height: 1.5;
+    color: var(--color-primary-dark);
+  }
+
+  .issue-one-term dd {
+    margin: 0;
+    font-size: 0.9rem;
+    line-height: 1.75;
+    color: var(--color-text);
+  }
+
+  /* 見出し付きの箇条書き。条件を1件ずつ縦に読ませる */
+  .issue-one-list {
+    margin: 1.35rem 0 0;
+  }
+
+  .issue-one-list-title {
+    margin: 0 0 0.5rem;
+    padding-left: 0.7rem;
+    border-left: 3px solid var(--color-accent);
+    font-size: 0.95rem;
+    font-weight: 800;
+    line-height: 1.6;
+    color: var(--color-primary-dark);
+  }
+
+  .issue-one-list ul {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .issue-one-list li {
+    position: relative;
+    padding: 0.35rem 0 0.35rem 1.1rem;
+    border-bottom: 1px solid var(--color-border-soft);
+    font-size: 0.95rem;
+    line-height: 1.8;
+  }
+
+  .issue-one-list li:last-child {
+    border-bottom: 0;
+  }
+
+  .issue-one-list li::before {
+    position: absolute;
+    top: 0.35rem;
+    left: 0.15rem;
+    color: var(--color-accent);
+    content: '・';
   }
 
   .issue-one-groups {
@@ -111,6 +477,14 @@ const hasContent =
 
   .issue-one-groups li:last-child {
     margin-bottom: 0;
+  }
+
+  @media (max-width: 560px) {
+    .issue-one-block,
+    .issue-one-summary {
+      padding-left: 1.15rem;
+      padding-right: 1.15rem;
+    }
   }
 
   .issue-one-boundary {

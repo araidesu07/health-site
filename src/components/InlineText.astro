@@ -1,0 +1,18 @@
+---
+/**
+ * frontmatter の文章を、**太字** だけ解釈して描画する汎用コンポーネント。
+ *
+ * set:html を使わない。各テキスト片は Astro の通常の式として出力されるため、
+ * 記事側に書かれた HTML はタグとして解釈されず、文字としてエスケープされる。
+ * `**` を含まない文章は、これまでと同じテキストがそのまま出る。
+ */
+import { parseInlineText } from '../lib/inlineText';
+
+interface Props {
+  text?: string | null;
+}
+
+const segments = parseInlineText(Astro.props.text);
+---
+
+{segments.map((s) => (s.bold ? <strong>{s.text}</strong> : s.text))}
