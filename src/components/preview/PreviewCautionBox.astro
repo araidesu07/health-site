@@ -1,0 +1,51 @@
+---
+/**
+ * 【ローカル確認専用】購入・使用前の注意を1箇所へ集約する小さな囲み。
+ * 本文で医療解説を展開せず、記事末尾付近に短く置くためのもの。
+ * 色は design-spec の警告色（オレンジ）を使う。
+ */
+interface Props {
+  items?: string[];
+}
+
+const { items = [] } = Astro.props;
+---
+
+{items.length > 0 && (
+  <aside class="caution-box">
+    <p class="caution-title">購入・使用前に確認</p>
+    <ul>{items.map((line) => <li>{line}</li>)}</ul>
+  </aside>
+)}
+
+<style>
+  .caution-box {
+    margin: 2.5rem 0;
+    padding: 1rem 1.1rem;
+    background: var(--color-warn-light);
+    border: 1px solid var(--color-warn);
+    border-radius: 8px;
+    font-size: 0.85rem;
+    line-height: 1.8;
+  }
+
+  .caution-title {
+    margin: 0 0 0.5rem;
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: var(--color-warn);
+  }
+
+  .caution-box ul {
+    margin: 0;
+    padding-left: 1.2em;
+  }
+
+  .caution-box li {
+    margin-bottom: 0.3rem;
+  }
+
+  .caution-box li:last-child {
+    margin-bottom: 0;
+  }
+</style>

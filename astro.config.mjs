@@ -1,6 +1,7 @@
 // @ts-check
 import { defineConfig } from 'astro/config';
 import { unified } from '@astrojs/markdown-remark';
+import sitemap from '@astrojs/sitemap';
 
 /**
  * Markdown が生成した <table> を <div class="table-wrapper"> で自動的に包む。
@@ -47,6 +48,8 @@ function rehypeTableWrapper() {
 export default defineConfig({
   // canonical URL / JSON-LD の絶対URL生成に使用
   site: 'https://health-evidence.jp',
+
+  integrations: [sitemap()],
 
   markdown: {
     // Astro 6 では markdown.rehypePlugins は非推奨。

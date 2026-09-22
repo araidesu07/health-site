@@ -17,6 +17,8 @@
 
 import AffiliateCTA from './AffiliateCTA.astro';
 import InlineText from './InlineText.astro';
+import IssueOneVisual from './IssueOneVisual.astro';
+import type { IssueOneVisualData } from './IssueOneVisual.astro';
 
 /** v3：結論に並べる推薦（products[] から渡される） */
 export interface ConclusionRecommendation {
@@ -38,6 +40,8 @@ interface Props {
   recommendations?: ConclusionRecommendation[];
   /** 見出し文言。通常は変えない */
   heading?: string;
+  /** v4：結論文の直下に置く視覚表現（conclusion.visual）。未指定なら何も描画しない */
+  visual?: IssueOneVisualData;
 }
 
 const {
@@ -45,6 +49,7 @@ const {
   issue1,
   recommendations = [],
   heading = 'この記事の結論',
+  visual,
 } = Astro.props;
 
 // frontmatter に conclusion を持たない既存記事では、丸ごと出力しない
@@ -81,6 +86,8 @@ const isV3 = issue1Text !== '' || recs.length > 0;
     </p>
 
     {issue1Text && <p class="conclusion-issue1"><InlineText text={issue1Text} /></p>}
+
+    {visual && <IssueOneVisual data={visual} />}
 
     {recs.length > 0 && (
       <ul class="conclusion-recs">

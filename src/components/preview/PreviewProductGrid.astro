@@ -1,0 +1,52 @@
+---
+/**
+ * 【ローカル確認専用】v10プレビュー用の商品カード並べ器。
+ * 列数・幅の広げ方は本番の ProductCardGrid.astro と同じ規則。
+ * 8商品を同じ強さで扱うため、並び順による強調は付けない。
+ */
+import PreviewProductCard from './PreviewProductCard.astro';
+import type { PreviewProduct } from './PreviewProductCard.astro';
+
+interface Props {
+  items?: PreviewProduct[];
+}
+
+const { items = [] } = Astro.props;
+const hasItems = Array.isArray(items) && items.length > 0;
+---
+
+{hasItems && (
+  <div class="product-grid">
+    {items.map((product) => <PreviewProductCard {...product} />)}
+  </div>
+)}
+
+<style>
+  .product-grid {
+    /* 本文幅（720px）の外へ広げて中央に合わせる */
+    width: min(1080px, calc(100vw - 3rem));
+    margin: 2rem 50% 2.5rem;
+    transform: translateX(-50%);
+
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 1rem;
+    align-items: stretch;
+  }
+
+  @media (max-width: 999px) {
+    .product-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
+  @media (max-width: 640px) {
+    .product-grid {
+      width: 100%;
+      margin: 2rem 0 2.5rem;
+      transform: none;
+      grid-template-columns: minmax(0, 1fr);
+      gap: 0.9rem;
+    }
+  }
+</style>

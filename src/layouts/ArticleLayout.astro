@@ -30,6 +30,7 @@ import SourceList from '../components/SourceList.astro';
 import PurchaseNotes from '../components/PurchaseNotes.astro';
 import type { Product } from '../components/ProductCard.astro';
 import type { IssueOneData } from '../components/IssueOneSection.astro';
+import type { IssueOneVisualData } from '../components/IssueOneVisual.astro';
 import type { Source } from '../components/SourceList.astro';
 import type { TypeGuideItem } from '../components/TypeGuide.astro';
 import type { CategoryDecisionData } from '../components/CategoryDecision.astro';
@@ -92,7 +93,17 @@ const conclusionIssue1: string | undefined =
     : undefined;
 /* v3 は「こんな人向け（direction）」付き。v4 は推薦を作らないので direction を渡さない。
    結論では「この記事で紹介する商品」を並べるだけにする */
-const conclusionRecommendations = isV3 && Array.isArray(products)
+/* v4：結論ボックスに置く視覚表現（conclusion.visual）。形式は issueOne.blocks[].visual と同じ。
+   商品一覧より先に「この記事で何を基準に絞れるか」を見せたい記事だけが指定する */
+const conclusionMap =
+  isV4 && conclusion && !Array.isArray(conclusion)
+    ? (conclusion as unknown as { visual?: IssueOneVisualData; showProducts?: boolean })
+    : undefined;
+const conclusionVisual: IssueOneVisualData | undefined = conclusionMap?.visual;
+/* v4：conclusion.showProducts: false のときだけ、結論ボックスの商品一覧を出さない。
+   未指定の記事（既存記事すべて）は従来どおり一覧を出す */
+const showConclusionProducts = conclusionMap?.showProducts !== false;
+const conclusionRecommendations = isV3 && showConclusionProducts && Array.isArray(products)
   ? products.map((p) => ({
       ...(isV4 ? {} : { direction: p.direction }),
       name: p.name,
@@ -118,6 +129,12 @@ const purchaseNotes: string[] | undefined =
 const comparisonLead: string | undefined =
   isV4 && typeof frontmatter.comparisonLead === 'string' && frontmatter.comparisonLead.trim() !== ''
     ? frontmatter.comparisonLead.trim()
+    : undefined;
+
+/* v4：比較表の見出し。未指定なら既定（「N商品の違いを比較」）。目次の文言も同じ値にそろえる */
+const comparisonHeading: string | undefined =
+  isV4 && typeof frontmatter.comparisonHeading === 'string' && frontmatter.comparisonHeading.trim() !== ''
+    ? frontmatter.comparisonHeading.trim()
     : undefined;
 
 const datePublished = toISODate(frontmatter.datePublished);
@@ -175,13 +192,14 @@ const jsonLd = {
         <ConclusionBox
           issue1={conclusionIssue1}
           recommendations={conclusionRecommendations}
+          visual={conclusionVisual}
         />
 
-        <TableOfContents issueOne={issueOne} issueOneTitle={issueOne?.title} products={products} v4={isV4} />
+        <TableOfContents issueOne={issueOne} issueOneTitle={issueOne?.title} products={products} summaryHeading={comparisonHeading} v4={isV4} />
 
         <IssueOneSection data={issueOne} />
 
-        <RecommendationSummary items={products} lead={comparisonLead} v4={isV4} />
+        <RecommendationSummary items={products} lead={comparisonLead} heading={comparisonHeading} v4={isV4} />
 
         {/* v3/v4 とも商品ごとに全幅の独立章。カードグリッドで横並びにしない */}
         {(products ?? []).map((product, i) => (

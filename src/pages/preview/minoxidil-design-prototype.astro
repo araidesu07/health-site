@@ -1,0 +1,1448 @@
+---
+/**
+ * デザイン確認用プロトタイプ（1ページ完結・使い捨て）
+ *
+ * 目的：白地＋青線中心の「資料・レポート感」を弱め、一般消費者向けの読み物として
+ *       成立するかをブラウザで確認する。完成形を FIX するための試作であり、
+ *       共通コンポーネント化・design system 化はここではやらない。
+ *
+ * - 既存の Layout / ArticleLayout / components は一切使わない（import ゼロ）
+ * - global.css も読み込まない。配色・余白はこのファイル内で完結させる
+ * - 文章・数値・出典はすべて drafts/minoxidil-5-otc.md（正本）からの転記。
+ *   このページで新しい事実・効能表現を作らない
+ *
+ * 今回作る範囲：タイトル／広告表記／著者 → 結論 → Issue① → Issue②冒頭の比較
+ *               → 商品詳細1商品 → 購入前の注意
+ */
+
+const meta = {
+  title: '市販発毛剤どれを選んだらいいの？｜現役薬剤師が解説！',
+  author: 'トウノ',
+  updated: { iso: '2026-09-15', label: '2026年9月15日' },
+};
+
+/** Issue② 冒頭のカード＋詳細表に使う4商品（正本 products[] から転記） */
+const products = [
+  {
+    name: 'スカルプD メディカルミノキ5 プレミアム',
+    maker: 'アンファー（販売元）／東亜薬品（製造販売元）',
+    keyPoint: 'クッションラバーヘッド採用の容器',
+    image:
+      'https://thumbnail.image.rakuten.co.jp/@0_mall/angfa/cabinet/10539148/10539151/mm_4.jpg?_ex=200x200',
+    price: '7,800円',
+    priceNote: '税込・公式サイト記載価格',
+    volume: '60mL',
+    days: '30日分',
+    actives: '3種',
+    channel: '一般の店舗と公式ストア',
+  },
+  {
+    name: 'リアップX5チャージ',
+    maker: '大正製薬',
+    keyPoint: 'ミノキシジル以外に7種の有効成分',
+    image:
+      'https://thumbnail.image.rakuten.co.jp/@0_mall/kenkocom/cabinet/040/4987306058040.jpg?_ex=200x200',
+    price: '8,140円',
+    priceNote: '税込・希望小売価格',
+    volume: '60mL',
+    days: '30日分',
+    actives: '7種',
+    channel: '一般の店舗と公式通販',
+  },
+  {
+    name: 'Minoプラス',
+    maker: '東和薬品（発売元）',
+    keyPoint: '1本72mLで36日分。通販専用',
+    image:
+      'https://thumbnail.image.rakuten.co.jp/@0_mall/towayakuhin/cabinet/10256132/shouhin/minoplus_1.jpg?_ex=200x200',
+    price: '5,940円',
+    priceNote: '税込・公式通販価格',
+    volume: '72mL',
+    days: '36日分',
+    actives: '4種',
+    channel: '通販専用',
+  },
+  {
+    name: 'リグロEX5エナジー',
+    maker: 'ロート製薬',
+    keyPoint: '60mL・希望小売価格5,940円。店頭でも買える',
+    image:
+      'https://thumbnail.image.rakuten.co.jp/@0_mall/rohtore96/cabinet/thumb/1974r1_v2.jpg?_ex=200x200',
+    price: '5,940円',
+    priceNote: '税込・希望小売価格',
+    volume: '60mL',
+    days: '約1ヵ月分',
+    actives: '4種',
+    channel: '一般の店舗と公式ストア',
+  },
+];
+
+/** 商品詳細を作る1商品（正本の1件目） */
+const detail = {
+  ...products[0],
+  overview: [
+    'やわらかいクッションラバーヘッドを採用し、頭皮に押し当ててタップしながら塗るタイプです。',
+    '液だれやヘッド側面の液漏れに配慮した設計で、公式サイトでは「しっとりとした使用感」を特徴として紹介しています。',
+    'ミノキシジル以外の有効成分は3種類です。',
+  ],
+  specs: [
+    { label: '価格', value: '7,800円（税込・公式サイト記載価格）' },
+    { label: '内容量', value: '60mL' },
+    { label: '1本の使用日数', value: '30日分' },
+    { label: 'ミノキシジル以外の有効成分', value: '3種' },
+    { label: '容器', value: '頭皮に押し込んで使うクッションラバーヘッド' },
+    { label: '購入方法', value: '一般の店舗と公式ストア' },
+  ],
+  ctaLabel: '楽天市場で商品を見る',
+  ctaUrl:
+    'https://rpx.a8.net/svt/ejp?a8mat=4BAFPJ+9N3QGI+2HOM+BWGDT&rakuten=y&a8ejpredirect=https%3A%2F%2Fhb.afl.rakuten.co.jp%2Fhgc%2Fg00ps334.2bo117d3.g00ps334.2bo12d93%2Fa26082750148_4BAFPJ_9N3QGI_2HOM_BWGDT%3Fpc%3Dhttps%253A%252F%252Fitem.rakuten.co.jp%252Fangfa%252Fmm5%252F%26m%3Dhttp%253A%252F%252Fm.rakuten.co.jp%252Fangfa%252Fi%252F10007647%252F%26rafcid%3Dwsc_i_is_a9f492a7-8ef9-40e2-ab89-4bc43a1ee283',
+};
+
+/** 医薬品／医薬部外品の比較。左右のカードで同じ4項目を並べる（列に強弱を付けない） */
+const compareAxes = ['制度上の区分', '効能・効果の文言', '販売時の手続き', '対象者の限定'];
+const compareSides = [
+  {
+    tag: '今回紹介する4商品',
+    name: 'ミノキシジル5%の外用発毛剤',
+    kind: '第1類医薬品',
+    values: [
+      '医薬品のうち一般用医薬品で、第1類医薬品。',
+      '「壮年性脱毛症における発毛、育毛及び脱毛（抜け毛）の進行予防。」',
+      '販売の際に、薬剤師が書面を用いて情報提供することが義務。',
+      '成人男性（20歳以上）の壮年性脱毛症のみ。女性・20歳未満は使用しない。',
+    ],
+  },
+  {
+    tag: '比較対象',
+    name: '育毛剤（養毛剤）',
+    kind: '医薬部外品',
+    values: [
+      '医薬部外品。医薬品とは別に定められた区分。',
+      '通知の表では「育毛、薄毛、かゆみ、脱毛の予防、毛生促進、発毛促進、ふけ、病後・産後の脱毛、養毛」の9項目。実際にどれを承認されているかは品目ごと。',
+      '市場に出荷された製品を販売するのに許可は不要。',
+      '通知の表に対象者の記載はない。',
+    ],
+  },
+];
+
+const purchaseNotes = [
+  '成人男性（20歳以上）の壮年性脱毛症に使う、第1類医薬品です。',
+  '女性や20歳未満の方は使用できないほか、体質や持病によっては使用前に相談が必要な場合があります。',
+  '毛髪が成長するには時間がかかるため、効果がわかるようになるまで少なくとも4か月間、1日2回の使用を続けるよう案内されています。',
+  '副作用を含む詳しい注意は、購入時の薬剤師の説明と添付文書で確認してください。',
+];
+---
+
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>{`[デザイン試作] ${meta.title}`}</title>
+  </head>
+  <body>
+    <p class="proto-flag">デザイン確認用のプロトタイプです（公開ページではありません）</p>
+
+    <div class="page">
+      <main class="wrap">
+        <!-- 1. タイトル・広告表記・著者 ------------------------------------ -->
+        <header class="hero">
+          <p class="hero-kicker">成人男性の壮年性脱毛症に使う第1類医薬品・4商品</p>
+          <h1 class="hero-title">{meta.title}</h1>
+          <div class="hero-foot">
+            <span class="pr-badge">PR</span>
+            <span class="pr-text">本記事はプロモーションを含みます。</span>
+          </div>
+          <div class="byline">
+            <span class="byline-avatar" aria-hidden="true">薬</span>
+            <span class="byline-body">
+              <span class="byline-name">著者：{meta.author}</span>
+              <span class="byline-meta">
+                更新日：<time datetime={meta.updated.iso}>{meta.updated.label}</time>
+              </span>
+            </span>
+          </div>
+        </header>
+
+        <!-- 2. この記事の結論 ---------------------------------------------- -->
+        <section class="conclusion" aria-labelledby="conclusion-h">
+          <p class="conclusion-label" id="conclusion-h">この記事の結論</p>
+          <p class="conclusion-lead">
+            今回紹介する4商品は、いずれも成人男性（20歳以上）の壮年性脱毛症に使うミノキシジル5%配合の第1類医薬品であり、承認された効能・効果には<strong
+              >「発毛」</strong
+            >が含まれています。
+          </p>
+          <p class="conclusion-sub">
+            医薬部外品の育毛剤とは、効能・効果の文言も買うときの手続きも異なります。
+          </p>
+          <ul class="conclusion-chips">
+            <li>第1類医薬品</li>
+            <li>ミノキシジル 5%（100mL中5.0g）</li>
+            <li>1日2回・1回1mL</li>
+            <li>成人男性 20歳以上</li>
+          </ul>
+        </section>
+
+        <!-- 3. Issue① ------------------------------------------------------ -->
+        <section class="issue" aria-labelledby="issue-one-h">
+          <div class="issue-head">
+            <span class="issue-num" aria-hidden="true">01</span>
+            <div>
+              <p class="issue-eyebrow">このカテゴリについて</p>
+              <h2 class="issue-title" id="issue-one-h">
+                ミノキシジル5%の外用発毛剤に期待できること
+              </h2>
+            </div>
+          </div>
+
+          <!-- ブロック1 -->
+          <article class="card block">
+            <h3 class="block-title">承認された効能・効果に「発毛」が含まれている</h3>
+
+            <p>今回紹介する4商品は、いずれも成人男性（20歳以上）の壮年性脱毛症に使う第1類医薬品です。</p>
+
+            <div class="keypoint">
+              <p class="keypoint-label">ここが要点</p>
+              <p class="keypoint-body">
+                承認された効能・効果は、4商品とも<strong
+                  >「壮年性脱毛症における発毛、育毛及び脱毛（抜け毛）の進行予防。」</strong
+                >です。
+              </p>
+            </div>
+
+            <figure class="scope">
+              <figcaption class="scope-caption">承認された効能・効果の範囲（同じひとつの効能・効果）</figcaption>
+              <div class="scope-items">
+                <span class="scope-item">育毛</span>
+                <span class="scope-plus" aria-hidden="true">＋</span>
+                <span class="scope-item">抜け毛の進行予防</span>
+                <span class="scope-plus" aria-hidden="true">＋</span>
+                <span class="scope-item is-focus">発毛</span>
+              </div>
+              <p class="scope-note">
+                承認された効能・効果の内容を整理したものです（承認文言そのものではありません）。いずれも「壮年性脱毛症における」という条件が付きます。
+              </p>
+            </figure>
+
+            <p>
+              抜け毛の進行予防や育毛と並んで、<strong>「発毛」</strong>が含まれています。つまり、抜け毛を抑えることだけを目的とした商品ではありません。
+            </p>
+            <p>
+              壮年性脱毛症の成人男性が、発毛も目的に使うものとして承認された区分です。逆に言えば、この条件に当てはまらない場合には使えません。
+            </p>
+          </article>
+
+          <!-- ブロック2 -->
+          <article class="card block">
+            <h3 class="block-title">医薬部外品の育毛剤とは区分が違う</h3>
+
+            <p>
+              髪の悩みに使う商品には、医薬品と医薬部外品があります。今回の4商品は第1類医薬品で、医薬部外品の育毛剤とは制度上の区分が別です。
+            </p>
+
+            <div class="vs">
+              <p class="vs-heading">2つの区分で違うところ</p>
+              <div class="vs-grid">
+                {compareSides.map((side) => (
+                  <div class="vs-card">
+                    <div class="vs-card-head">
+                      <span class="vs-tag">{side.tag}</span>
+                      <p class="vs-name">{side.name}</p>
+                      <p class="vs-kind">{side.kind}</p>
+                    </div>
+                    <dl class="vs-list">
+                      {side.values.map((value, i) => (
+                        <div class="vs-row">
+                          <dt>{compareAxes[i]}</dt>
+                          <dd>{value}</dd>
+                        </div>
+                      ))}
+                    </dl>
+                  </div>
+                ))}
+              </div>
+              <p class="vs-note">
+                区分・効能効果の文言・販売時の手続き・対象者の違いを整理したものです。効果の大小を比べたものではありません。
+              </p>
+            </div>
+
+            <p>
+              医薬部外品の育毛剤（養毛剤）については、厚生労働省の通知に効能・効果の範囲として9項目が挙げられています。この表は「概ね」「参考」という位置づけで、個々の製品がどれを承認されているかは品目ごとに決まります。
+            </p>
+            <p>
+              買うときの手続きも違います。第1類医薬品は、販売の際に薬剤師が書面を用いて情報提供することが義務づけられています。医薬部外品は、市場に出荷された製品を販売するのに許可は必要ありません。
+            </p>
+            <p>
+              使える人の範囲も違います。今回の4商品を使えるのは、壮年性脱毛症の成人男性（20歳以上）だけです。女性や20歳未満の方は使用できません。医薬部外品の育毛剤については、通知の表に対象者の記載はありません。
+            </p>
+
+            <div class="keypoint">
+              <p class="keypoint-label">選ぶときのポイント</p>
+              <p class="keypoint-body">
+                <strong>「発毛」「育毛」という言葉だけで判断せず、医薬品なのか医薬部外品なのかを確かめておく</strong>と、自分が探しているものと合っているか判断しやすくなります。効能・効果の文言、販売時の手続き、使える人の範囲が、区分によって違うからです。
+              </p>
+            </div>
+          </article>
+
+          <!-- ブロック3：まとめ -->
+          <aside class="summary" aria-label="ここまでのまとめ">
+            <p class="summary-label">ここまでのまとめ</p>
+            <p class="summary-body">
+              今回の4商品は、壮年性脱毛症の成人男性（20歳以上）に向けて、効能・効果に「発毛」を含む形で承認された第1類医薬品です。医薬部外品の育毛剤とは、効能・効果の文言も、販売時の手続きも、使える人の範囲も違います。
+            </p>
+            <p class="summary-next">
+              ここまでが4商品に共通する部分です。ここからは、4商品の違いを見ていきます。
+            </p>
+          </aside>
+        </section>
+
+        <!-- 4. Issue②冒頭の商品比較 ---------------------------------------- -->
+        <section class="issue" aria-labelledby="issue-two-h">
+          <div class="issue-head">
+            <span class="issue-num" aria-hidden="true">02</span>
+            <div>
+              <p class="issue-eyebrow">商品ごとの違い</p>
+              <h2 class="issue-title" id="issue-two-h">4商品の違いを比較</h2>
+            </div>
+          </div>
+
+          <p class="issue-lead">
+            今回の4商品は、ミノキシジルの濃度（100mL中5.0g）も、承認されている効能・効果も、1日2回1回1mLという使い方も同じです。この記事では、価格・内容量・ミノキシジル以外の有効成分・容器・購入方法の5点を中心に比較します。
+          </p>
+
+          <ul class="pcards">
+            {products.map((p) => (
+              <li class="pcard">
+                <div class="pcard-thumb">
+                  <img src={p.image} alt={p.name} loading="lazy" width="200" height="200" />
+                </div>
+                <p class="pcard-name">{p.name}</p>
+                <p class="pcard-maker">{p.maker}</p>
+                <p class="pcard-diff">
+                  <span class="pcard-diff-label">主な違い</span>
+                  {p.keyPoint}
+                </p>
+              </li>
+            ))}
+          </ul>
+
+          <details class="table-fold" open>
+            <summary>数字で並べて見る</summary>
+            <div class="table-scroll">
+              <table class="spec-table">
+                <thead>
+                  <tr>
+                    <th scope="col">商品</th>
+                    <th scope="col">価格</th>
+                    <th scope="col">内容量</th>
+                    <th scope="col">1本の使用日数</th>
+                    <th scope="col">ミノキシジル以外の有効成分</th>
+                    <th scope="col">購入方法</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {products.map((p) => (
+                    <tr>
+                      <th scope="row">{p.name}</th>
+                      <td>
+                        {p.price}
+                        <span class="cell-note">{p.priceNote}</span>
+                      </td>
+                      <td>{p.volume}</td>
+                      <td>{p.days}</td>
+                      <td>{p.actives}</td>
+                      <td>{p.channel}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <p class="table-note">
+              価格は2026年9月11日時点で各メーカー公式が提示している税込価格です。価格の種別は商品によって異なり、店頭の実売価格とは異なる場合があります。
+            </p>
+          </details>
+        </section>
+
+        <!-- 5. 商品詳細（1商品分） ------------------------------------------ -->
+        <section class="detail" aria-labelledby="detail-h">
+          <div class="detail-head">
+            <div class="detail-thumb">
+              <img src={detail.image} alt={detail.name} loading="lazy" width="200" height="200" />
+            </div>
+            <div class="detail-head-body">
+              <p class="detail-maker">{detail.maker}</p>
+              <h3 class="detail-name" id="detail-h">{detail.name}</h3>
+              <p class="detail-price">
+                {detail.price}
+                <span class="detail-price-note">{detail.priceNote}</span>
+              </p>
+              <p class="detail-chip">{detail.keyPoint}</p>
+            </div>
+          </div>
+
+          <div class="detail-body">
+            <h4 class="detail-sub">この商品の特徴</h4>
+            {detail.overview.map((t) => (
+              <p>{t}</p>
+            ))}
+
+            <h4 class="detail-sub">主要スペック</h4>
+            <dl class="spec-list">
+              {detail.specs.map((s) => (
+                <div class="spec-row">
+                  <dt>{s.label}</dt>
+                  <dd>{s.value}</dd>
+                </div>
+              ))}
+            </dl>
+          </div>
+
+          <div class="detail-cta">
+            <a
+              class="cta"
+              href={detail.ctaUrl}
+              target="_blank"
+              rel="nofollow sponsored noopener noreferrer"
+            >
+              <span>{detail.ctaLabel}</span>
+              <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+                <path
+                  d="M6.5 3.5H3.2A1.2 1.2 0 0 0 2 4.7v8.1A1.2 1.2 0 0 0 3.2 14h8.1a1.2 1.2 0 0 0 1.2-1.2V9.5"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.6"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+                <path
+                  d="M9.5 2h4.5v4.5M13.6 2.4L7.8 8.2"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.6"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+              </svg>
+            </a>
+            <p class="cta-note">リンク先は楽天市場の販売ページです。</p>
+          </div>
+        </section>
+
+        <!-- 6. 購入前の注意 ------------------------------------------------- -->
+        <section class="notes" aria-labelledby="notes-h">
+          <h2 class="notes-title" id="notes-h">
+            <span class="notes-icon" aria-hidden="true">!</span>
+            購入・使用前に確認
+          </h2>
+          <ul class="notes-list">
+            {purchaseNotes.map((t) => (
+              <li>{t}</li>
+            ))}
+          </ul>
+        </section>
+      </main>
+    </div>
+  </body>
+</html>
+
+<style is:global>
+  /* ============================================================
+     デザイントークン（このプロトタイプ内でのみ有効）
+     ほぼ白のニュートラル暖色地／深い青緑を基本色／淡いベージュを補助色
+     温かみは背景の色みではなく、角丸・余白・shadow・要点のベージュで作る。
+     黄緑に転ぶ色（淡グリーン、黄寄りのベージュ地）は使わない
+     ============================================================ */
+  :root {
+    --ink: #273130;
+    --ink-soft: #5f6b68;
+    --ink-faint: #8e9895;
+
+    --teal-900: #0a3e3a;
+    --teal-700: #10605a;
+    --teal-600: #157f74;
+    --teal-100: #d5e8e4;
+    --teal-50: #edf5f4;
+
+    /* 要点・チップ用の淡いベージュ（旧 --green-* の置き換え） */
+    --sand-50: #fbf6ed;
+    --sand-100: #ecdfc9;
+
+    --beige-50: #faf5ec;
+    --beige-100: #ecdfc9;
+
+    /* ページ地は白。温かみは背景色ではなく、角丸・余白・影・要点の淡色で作る */
+    --paper: #ffffff;
+    --surface: #ffffff;
+    /* 画像を置く窪み。白カードとの差は最小限に */
+    --well: #f7f7f5;
+    /* カードの輪郭はごく薄く。浮きは影で作る */
+    --line: #ebebe8;
+    --line-soft: #f2f2ef;
+
+    --amber-700: #8a5a1f;
+    --amber-50: #fdf4e6;
+    --amber-100: #f2e0c2;
+
+    --radius-lg: 18px;
+    --radius-md: 12px;
+    --radius-sm: 8px;
+
+    /* 白地の上で「紙が少し浮いて見える」程度。黒く重い影にしない。
+       近接の1px＋中距離のにじみを重ね、単発の強い影を使わない */
+    --shadow-card: 0 1px 1px rgba(23, 26, 25, 0.025), 0 3px 6px rgba(23, 26, 25, 0.035),
+      0 12px 26px -12px rgba(23, 26, 25, 0.09);
+    --shadow-soft: 0 1px 1px rgba(23, 26, 25, 0.02), 0 2px 5px rgba(23, 26, 25, 0.03),
+      0 8px 18px -10px rgba(23, 26, 25, 0.07);
+
+    color-scheme: light;
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, 'Hiragino Kaku Gothic ProN', 'Noto Sans JP',
+      'Yu Gothic Medium', 'Yu Gothic', Meiryo, sans-serif;
+    font-size: 16.5px;
+    line-height: 1.95;
+    letter-spacing: 0.01em;
+  }
+
+  img {
+    max-width: 100%;
+    height: auto;
+  }
+
+  /* 試作であることの目印。完成形には持ち込まない */
+  .proto-flag {
+    margin: 0;
+    padding: 0.5rem 1rem;
+    background: var(--teal-900);
+    color: #dceae7;
+    font-size: 0.75rem;
+    letter-spacing: 0.04em;
+    text-align: center;
+  }
+
+  .page {
+    padding: 2.2rem 1rem 5rem;
+  }
+
+  .wrap {
+    max-width: 44rem;
+    margin: 0 auto;
+  }
+
+  p {
+    margin: 0 0 1.15rem;
+  }
+
+  p:last-child {
+    margin-bottom: 0;
+  }
+
+  strong {
+    font-weight: 700;
+    color: var(--teal-900);
+  }
+
+  /* --- 1. タイトル・広告表記・著者 ---------------------------------- */
+
+  .hero {
+    margin-bottom: 1.6rem;
+  }
+
+  .hero-kicker {
+    margin: 0 0 0.6rem;
+    color: var(--teal-600);
+    font-size: 0.82rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+  }
+
+  .hero-title {
+    margin: 0 0 1rem;
+    font-size: clamp(1.5rem, 5.2vw, 2.05rem);
+    font-weight: 800;
+    line-height: 1.5;
+    letter-spacing: 0.005em;
+    color: var(--teal-900);
+  }
+
+  .hero-foot {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.9rem;
+  }
+
+  .pr-badge {
+    flex: none;
+    padding: 0.1rem 0.5rem;
+    border-radius: 999px;
+    background: var(--beige-50);
+    border: 1px solid var(--beige-100);
+    color: var(--amber-700);
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+  }
+
+  .pr-text {
+    color: var(--ink-faint);
+    font-size: 0.78rem;
+    line-height: 1.6;
+  }
+
+  .byline {
+    display: flex;
+    align-items: center;
+    gap: 0.7rem;
+    padding: 0.7rem 0.95rem;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    background: var(--surface);
+  }
+
+  .byline-avatar {
+    display: grid;
+    place-items: center;
+    flex: none;
+    width: 2.1rem;
+    height: 2.1rem;
+    border-radius: 50%;
+    background: var(--teal-50);
+    color: var(--teal-700);
+    font-size: 0.85rem;
+    font-weight: 700;
+  }
+
+  .byline-body {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.15rem 0.9rem;
+  }
+
+  .byline-name {
+    font-size: 0.88rem;
+    font-weight: 700;
+    color: var(--ink);
+  }
+
+  .byline-meta {
+    font-size: 0.78rem;
+    color: var(--ink-faint);
+  }
+
+  /* --- 2. 結論カード ------------------------------------------------ */
+
+  .conclusion {
+    position: relative;
+    margin-bottom: 3.4rem;
+    padding: 1.8rem 1.6rem 1.6rem;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-lg);
+    background: var(--surface);
+    box-shadow: var(--shadow-card);
+  }
+
+  .conclusion-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    margin: 0 0 0.9rem;
+    padding: 0.3rem 0.85rem;
+    border-radius: 999px;
+    background: var(--teal-700);
+    color: #fff;
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+  }
+
+  .conclusion-lead {
+    margin: 0 0 0.8rem;
+    font-size: 1.12rem;
+    font-weight: 600;
+    line-height: 1.95;
+    color: var(--teal-900);
+  }
+
+  .conclusion-lead strong {
+    padding: 0 0.15rem;
+    background: linear-gradient(transparent 62%, var(--sand-100) 62%);
+    font-weight: 800;
+  }
+
+  .conclusion-sub {
+    margin: 0 0 1.2rem;
+    color: var(--ink-soft);
+    font-size: 0.95rem;
+  }
+
+  .conclusion-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.45rem;
+    margin: 0;
+    padding: 1.1rem 0 0;
+    border-top: 1px dashed var(--line);
+    list-style: none;
+  }
+
+  .conclusion-chips li {
+    padding: 0.3rem 0.7rem;
+    border-radius: var(--radius-sm);
+    background: var(--teal-50);
+    color: var(--teal-700);
+    font-size: 0.8rem;
+    font-weight: 600;
+    line-height: 1.6;
+  }
+
+  /* --- 3. セクション見出し（01 / 02） ------------------------------- */
+
+  .issue {
+    margin-bottom: 3.6rem;
+  }
+
+  .issue-head {
+    display: flex;
+    align-items: center;
+    gap: 0.95rem;
+    margin-bottom: 1.35rem;
+  }
+
+  .issue-num {
+    display: grid;
+    place-items: center;
+    flex: none;
+    width: 3rem;
+    height: 3rem;
+    border-radius: var(--radius-md);
+    background: var(--teal-700);
+    color: #fff;
+    font-size: 1.15rem;
+    font-weight: 800;
+    letter-spacing: 0.02em;
+    box-shadow: 0 6px 14px -8px rgba(10, 62, 58, 0.55);
+  }
+
+  .issue-eyebrow {
+    margin: 0 0 0.1rem;
+    color: var(--teal-600);
+    font-size: 0.76rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+  }
+
+  .issue-title {
+    margin: 0;
+    font-size: clamp(1.2rem, 4.2vw, 1.45rem);
+    font-weight: 800;
+    line-height: 1.55;
+    color: var(--teal-900);
+  }
+
+  .issue-lead {
+    margin: 0 0 1.4rem;
+    color: var(--ink-soft);
+    font-size: 0.97rem;
+  }
+
+  /* --- カード共通 --------------------------------------------------- */
+
+  .card {
+    padding: 1.7rem 1.6rem;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-lg);
+    background: var(--surface);
+    box-shadow: var(--shadow-card);
+  }
+
+  .block + .block {
+    margin-top: 1.5rem;
+  }
+
+  .block-title {
+    margin: 0 0 1.15rem;
+    padding-left: 0.85rem;
+    border-left: 4px solid var(--teal-600);
+    font-size: 1.1rem;
+    font-weight: 800;
+    line-height: 1.6;
+    color: var(--teal-900);
+  }
+
+  /* --- Key Point ---------------------------------------------------- */
+
+  .keypoint {
+    margin: 1.35rem 0;
+    padding: 1.15rem 1.25rem;
+    border: 1px solid var(--sand-100);
+    border-radius: var(--radius-md);
+    background: var(--sand-50);
+  }
+
+  .keypoint-label {
+    margin: 0 0 0.45rem;
+    color: var(--teal-700);
+    font-size: 0.76rem;
+    font-weight: 700;
+    letter-spacing: 0.07em;
+  }
+
+  .keypoint-body {
+    margin: 0;
+    font-size: 1.04rem;
+    font-weight: 600;
+    line-height: 1.9;
+    color: var(--ink);
+  }
+
+  .keypoint-body strong {
+    color: var(--teal-900);
+  }
+
+  /* --- 承認効能の範囲（育毛＋抜け毛の進行予防＋発毛） ---------------- */
+
+  .scope {
+    margin: 1.5rem 0;
+    padding: 1.2rem 1.1rem 1rem;
+    border: 1px solid var(--teal-100);
+    border-radius: var(--radius-md);
+    background: var(--teal-50);
+  }
+
+  .scope-caption {
+    margin-bottom: 0.9rem;
+    color: var(--teal-700);
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-align: center;
+  }
+
+  .scope-items {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: stretch;
+    justify-content: center;
+    gap: 0.5rem;
+  }
+
+  .scope-item {
+    display: grid;
+    place-items: center;
+    flex: 1 1 7.5rem;
+    min-height: 3.3rem;
+    padding: 0.5rem 0.7rem;
+    border: 1px solid var(--teal-100);
+    border-radius: var(--radius-sm);
+    background: var(--surface);
+    font-size: 0.97rem;
+    font-weight: 700;
+    line-height: 1.5;
+    text-align: center;
+    color: var(--ink);
+  }
+
+  /* 「発毛」だけ一段強調。ただし枠・背景の系統は3つとも同じに保ち、
+     同じ承認効能の範囲に入っていることが読み取れるようにする */
+  .scope-item.is-focus {
+    border-color: var(--teal-600);
+    border-width: 2px;
+    background: #fff;
+    color: var(--teal-900);
+    font-size: 1.1rem;
+    box-shadow: 0 0 0 4px rgba(21, 127, 116, 0.09);
+  }
+
+  .scope-plus {
+    display: grid;
+    place-items: center;
+    flex: none;
+    color: var(--teal-600);
+    font-size: 1rem;
+    font-weight: 700;
+  }
+
+  .scope-note {
+    margin: 0.85rem 0 0;
+    color: var(--ink-soft);
+    font-size: 0.78rem;
+    line-height: 1.75;
+  }
+
+  /* --- 医薬品 vs 医薬部外品（左右カード） ---------------------------- */
+
+  .vs {
+    margin: 1.5rem 0;
+  }
+
+  .vs-heading {
+    margin: 0 0 0.8rem;
+    color: var(--ink-soft);
+    font-size: 0.8rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+  }
+
+  .vs-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+    gap: 0.8rem;
+  }
+
+  /* 2枚のカードは同じ枠・同じ背景・同じ影。どちらかを優位に見せる装飾はしない */
+  .vs-card {
+    display: flex;
+    flex-direction: column;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-md);
+    background: var(--surface);
+    box-shadow: var(--shadow-soft);
+    overflow: hidden;
+  }
+
+  .vs-card-head {
+    padding: 0.9rem 1rem;
+    border-bottom: 1px solid var(--line-soft);
+    background: var(--beige-50);
+  }
+
+  .vs-tag {
+    display: inline-block;
+    margin-bottom: 0.35rem;
+    padding: 0.08rem 0.5rem;
+    border-radius: 999px;
+    background: #fff;
+    border: 1px solid var(--beige-100);
+    color: var(--amber-700);
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+  }
+
+  .vs-name {
+    margin: 0;
+    font-size: 0.98rem;
+    font-weight: 800;
+    line-height: 1.55;
+    color: var(--ink);
+  }
+
+  .vs-kind {
+    margin: 0.1rem 0 0;
+    color: var(--ink-soft);
+    font-size: 0.8rem;
+    font-weight: 700;
+  }
+
+  .vs-list {
+    margin: 0;
+    padding: 0.35rem 1rem 0.9rem;
+  }
+
+  .vs-row {
+    padding: 0.7rem 0;
+    border-bottom: 1px dashed var(--line);
+  }
+
+  .vs-row:last-child {
+    border-bottom: 0;
+  }
+
+  .vs-row dt {
+    margin-bottom: 0.2rem;
+    color: var(--teal-600);
+    font-size: 0.74rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+  }
+
+  .vs-row dd {
+    margin: 0;
+    font-size: 0.9rem;
+    line-height: 1.8;
+    color: var(--ink);
+  }
+
+  .vs-note {
+    margin: 0.85rem 0 0;
+    color: var(--ink-soft);
+    font-size: 0.78rem;
+    line-height: 1.75;
+  }
+
+  /* --- ここまでのまとめ --------------------------------------------- */
+
+  .summary {
+    margin-top: 1.5rem;
+    padding: 1.5rem 1.5rem 1.35rem;
+    border: 1px solid var(--teal-700);
+    border-radius: var(--radius-lg);
+    background: var(--teal-900);
+    color: #e9f3f1;
+    box-shadow: var(--shadow-card);
+  }
+
+  .summary-label {
+    display: inline-block;
+    margin: 0 0 0.7rem;
+    padding: 0.22rem 0.7rem;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.14);
+    color: #fff;
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.07em;
+  }
+
+  .summary-body {
+    margin: 0 0 0.9rem;
+    font-size: 1.04rem;
+    font-weight: 600;
+    line-height: 1.95;
+    color: #fff;
+  }
+
+  .summary-next {
+    margin: 0;
+    padding-top: 0.85rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.18);
+    font-size: 0.9rem;
+    color: #cfe3df;
+  }
+
+  /* --- 4. 商品カード ------------------------------------------------ */
+
+  .pcards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+    gap: 1.1rem;
+    margin: 0 0 2rem;
+    padding: 0;
+    list-style: none;
+  }
+
+  .pcard {
+    display: flex;
+    flex-direction: column;
+    padding: 1.15rem 1.05rem 1.2rem;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-lg);
+    background: var(--surface);
+    box-shadow: var(--shadow-card);
+  }
+
+  .pcard-thumb {
+    display: grid;
+    place-items: center;
+    height: 8.5rem;
+    margin-bottom: 0.9rem;
+    border-radius: var(--radius-md);
+    background: var(--well);
+  }
+
+  .pcard-thumb img {
+    max-height: 7.5rem;
+    width: auto;
+    mix-blend-mode: multiply;
+  }
+
+  .pcard-name {
+    margin: 0 0 0.2rem;
+    font-size: 0.97rem;
+    font-weight: 800;
+    line-height: 1.55;
+    color: var(--ink);
+  }
+
+  .pcard-maker {
+    margin: 0 0 0.75rem;
+    color: var(--ink-faint);
+    font-size: 0.76rem;
+    line-height: 1.6;
+  }
+
+  .pcard-diff {
+    margin: auto 0 0;
+    padding: 0.7rem 0.8rem;
+    border-radius: var(--radius-sm);
+    background: var(--teal-50);
+    font-size: 0.86rem;
+    font-weight: 600;
+    line-height: 1.7;
+    color: var(--teal-900);
+  }
+
+  .pcard-diff-label {
+    display: block;
+    margin-bottom: 0.1rem;
+    color: var(--teal-600);
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+  }
+
+  /* --- 詳細表（カードの後） ----------------------------------------- */
+
+  /* 詳細表は「浮かせる」対象にしない。白地の上に薄い枠だけで置く */
+  .table-fold {
+    padding: 0.2rem 1.2rem 1.2rem;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-lg);
+    background: var(--surface);
+  }
+
+  .table-fold > summary {
+    padding: 1rem 0;
+    color: var(--teal-700);
+    font-size: 0.9rem;
+    font-weight: 700;
+    cursor: pointer;
+  }
+
+  .table-scroll {
+    overflow-x: auto;
+  }
+
+  .spec-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+  }
+
+  .spec-table th,
+  .spec-table td {
+    padding: 0.7rem 0.75rem;
+    border-bottom: 1px solid var(--line-soft);
+    text-align: left;
+    vertical-align: top;
+    line-height: 1.7;
+  }
+
+  .spec-table thead th {
+    border-bottom: 1px solid var(--line);
+    color: var(--ink-soft);
+    font-size: 0.76rem;
+    font-weight: 700;
+    white-space: nowrap;
+  }
+
+  .spec-table tbody th {
+    min-width: 11rem;
+    font-weight: 700;
+    color: var(--ink);
+  }
+
+  .spec-table tbody tr:last-child th,
+  .spec-table tbody tr:last-child td {
+    border-bottom: 0;
+  }
+
+  .cell-note {
+    display: block;
+    color: var(--ink-faint);
+    font-size: 0.7rem;
+    line-height: 1.5;
+  }
+
+  .table-note {
+    margin: 0.9rem 0 0;
+    color: var(--ink-faint);
+    font-size: 0.75rem;
+    line-height: 1.7;
+  }
+
+  /* --- 5. 商品詳細 -------------------------------------------------- */
+
+  .detail {
+    margin-bottom: 3.6rem;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-lg);
+    background: var(--surface);
+    box-shadow: var(--shadow-card);
+    overflow: hidden;
+  }
+
+  .detail-head {
+    display: flex;
+    gap: 1.1rem;
+    padding: 1.4rem 1.5rem;
+    background: var(--surface);
+    border-bottom: 1px solid var(--line-soft);
+  }
+
+  .detail-thumb {
+    display: grid;
+    place-items: center;
+    flex: none;
+    width: 6.5rem;
+    height: 6.5rem;
+    border-radius: var(--radius-md);
+    background: var(--well);
+  }
+
+  .detail-thumb img {
+    max-height: 5.5rem;
+    width: auto;
+    mix-blend-mode: multiply;
+  }
+
+  .detail-maker {
+    margin: 0 0 0.15rem;
+    color: var(--ink-faint);
+    font-size: 0.78rem;
+  }
+
+  .detail-name {
+    margin: 0 0 0.5rem;
+    font-size: 1.16rem;
+    font-weight: 800;
+    line-height: 1.55;
+    color: var(--teal-900);
+  }
+
+  .detail-price {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.5rem;
+    margin: 0 0 0.6rem;
+    font-size: 1.25rem;
+    font-weight: 800;
+    color: var(--ink);
+  }
+
+  .detail-price-note {
+    color: var(--ink-faint);
+    font-size: 0.72rem;
+    font-weight: 500;
+  }
+
+  .detail-chip {
+    display: inline-block;
+    margin: 0;
+    padding: 0.3rem 0.7rem;
+    border-radius: var(--radius-sm);
+    background: var(--sand-50);
+    border: 1px solid var(--sand-100);
+    font-size: 0.82rem;
+    font-weight: 600;
+    line-height: 1.6;
+    color: var(--ink);
+  }
+
+  .detail-body {
+    padding: 1.4rem 1.5rem 0.3rem;
+  }
+
+  .detail-sub {
+    margin: 0 0 0.85rem;
+    color: var(--teal-700);
+    font-size: 0.86rem;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+  }
+
+  .detail-body p {
+    font-size: 0.97rem;
+  }
+
+  .spec-list {
+    margin: 0 0 1.4rem;
+    padding: 0;
+    border-top: 1px solid var(--line-soft);
+  }
+
+  .spec-row {
+    display: grid;
+    grid-template-columns: 11rem 1fr;
+    gap: 0.6rem;
+    padding: 0.7rem 0.2rem;
+    border-bottom: 1px solid var(--line-soft);
+  }
+
+  .spec-row dt {
+    color: var(--ink-soft);
+    font-size: 0.82rem;
+    font-weight: 700;
+    line-height: 1.75;
+  }
+
+  .spec-row dd {
+    margin: 0;
+    font-size: 0.92rem;
+    font-weight: 600;
+    line-height: 1.75;
+  }
+
+  .detail-cta {
+    padding: 0 1.5rem 1.5rem;
+  }
+
+  .cta {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.55rem;
+    padding: 1rem 1.2rem;
+    border-radius: var(--radius-md);
+    background: var(--teal-700);
+    color: #fff;
+    font-size: 1rem;
+    font-weight: 700;
+    text-decoration: none;
+    box-shadow: 0 8px 18px -10px rgba(10, 62, 58, 0.6);
+  }
+
+  .cta:hover {
+    background: var(--teal-600);
+  }
+
+  .cta svg {
+    width: 1rem;
+    height: 1rem;
+    flex: none;
+  }
+
+  .cta-note {
+    margin: 0.7rem 0 0;
+    color: var(--ink-faint);
+    font-size: 0.75rem;
+    text-align: center;
+  }
+
+  /* --- 6. 購入前の注意 ---------------------------------------------- */
+
+  .notes {
+    padding: 1.5rem 1.5rem 1.3rem;
+    border: 1px solid var(--amber-100);
+    border-radius: var(--radius-lg);
+    background: var(--amber-50);
+  }
+
+  .notes-title {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    margin: 0 0 1rem;
+    font-size: 1.05rem;
+    font-weight: 800;
+    color: var(--amber-700);
+  }
+
+  .notes-icon {
+    display: grid;
+    place-items: center;
+    flex: none;
+    width: 1.6rem;
+    height: 1.6rem;
+    border-radius: 50%;
+    background: var(--amber-700);
+    color: var(--amber-50);
+    font-size: 0.9rem;
+    font-weight: 800;
+  }
+
+  .notes-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .notes-list li {
+    position: relative;
+    padding: 0.55rem 0 0.55rem 1.15rem;
+    border-bottom: 1px dashed var(--amber-100);
+    font-size: 0.92rem;
+    line-height: 1.85;
+    color: #4a3a22;
+  }
+
+  .notes-list li:last-child {
+    border-bottom: 0;
+  }
+
+  .notes-list li::before {
+    position: absolute;
+    top: 0.55rem;
+    left: 0;
+    color: var(--amber-700);
+    content: '・';
+  }
+
+  /* --- 狭い画面 ----------------------------------------------------- */
+
+  @media (max-width: 560px) {
+    body {
+      font-size: 16px;
+    }
+
+    .page {
+      padding: 1.6rem 0.85rem 4rem;
+    }
+
+    .conclusion,
+    .card,
+    .summary,
+    .notes {
+      padding-left: 1.15rem;
+      padding-right: 1.15rem;
+    }
+
+    .issue-num {
+      width: 2.6rem;
+      height: 2.6rem;
+      font-size: 1rem;
+    }
+
+    .scope-items {
+      flex-direction: column;
+    }
+
+    .scope-item {
+      min-height: 0;
+      padding: 0.7rem;
+    }
+
+    .detail-head {
+      flex-direction: column;
+      padding: 1.2rem 1.15rem;
+    }
+
+    .detail-thumb {
+      width: 5.5rem;
+      height: 5.5rem;
+    }
+
+    .detail-body {
+      padding: 1.2rem 1.15rem 0.3rem;
+    }
+
+    .detail-cta {
+      padding: 0 1.15rem 1.2rem;
+    }
+
+    .spec-row {
+      grid-template-columns: 1fr;
+      gap: 0.1rem;
+    }
+
+    .spec-table tbody th {
+      min-width: 9rem;
+    }
+  }
+</style>

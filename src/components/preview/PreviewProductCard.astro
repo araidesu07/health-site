@@ -1,0 +1,241 @@
+---
+/**
+ * 【ローカル確認専用】v10プレビュー用の商品カード。
+ *
+ * 本番の ProductCard.astro は schema v3（direction / directReason /「おすすめポイント」）
+ * を前提にしており、推薦・優劣の枠を持つ。v10 は商品間の優劣を付けない記事なので、
+ * 本番コンポーネントには手を入れず、プレビュー専用にこのカードを置く。
+ * 見た目（余白・角丸・色変数・スマホ時の横並び）は ProductCard.astro から写している。
+ *
+ * 構成
+ *   1. 商品画像（未取得ならプレースホルダー）
+ *   2. 商品名
+ *   3. 価格 / 内容量 / 主な有効成分
+ *   4. メーカーが公式に訴求している特徴
+ *   5. CTA（販売URL未取得のためプレースホルダー）
+ */
+export interface PreviewProduct {
+  name: string;
+  maker: string;
+  /** 商品画像URL。未指定ならプレースホルダーを出す */
+  image?: string;
+  price: string;
+  volume: string;
+  /** 主な有効成分 */
+  ingredients: string;
+  /** メーカーが公式に訴求している特徴（1〜3文） */
+  makerClaims: string[];
+  /** 販売ページURL。未指定ならCTAをプレースホルダーとして出す */
+  url?: string;
+}
+
+const { name, maker, image, price, volume, ingredients, makerClaims = [], url } =
+  Astro.props as PreviewProduct;
+---
+
+<article class="product-card">
+  <div class="product-head">
+    <div class="product-image">
+      {image ? (
+        <img src={image} alt={name} width="300" height="300" loading="lazy" decoding="async" />
+      ) : (
+        <span class="product-image-empty">商品画像<br />（未取得）</span>
+      )}
+    </div>
+
+    <div class="product-head-text">
+      <p class="product-maker">{maker}</p>
+      <h3 class="product-name">{name}</h3>
+
+      <ul class="product-spec">
+        <li><span class="spec-label">価格</span><span class="spec-value">{price}</span></li>
+        <li><span class="spec-label">内容量</span><span class="spec-value">{volume}</span></li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="product-block">
+    <p class="product-block-title">主な有効成分</p>
+    <p class="product-block-body">{ingredients}</p>
+  </div>
+
+  {makerClaims.length > 0 && (
+    <div class="product-block">
+      <p class="product-block-title">メーカーが公式に訴求している特徴</p>
+      {makerClaims.map((line) => <p class="product-block-body">{line}</p>)}
+    </div>
+  )}
+
+  {url ? (
+    <a class="product-cta" href={url} target="_blank" rel="nofollow sponsored">販売ページを見る</a>
+  ) : (
+    <span class="product-cta product-cta-placeholder">販売ページを見る<small>（リンク未設定・CTA枠）</small></span>
+  )}
+</article>
+
+<style>
+  /* 色は global.css の :root 変数だけを使う */
+  .product-card {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    padding: 1rem;
+    background: var(--color-bg);
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+  }
+
+  .product-head {
+    margin-bottom: 0.9rem;
+  }
+
+  .product-image {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 160px;
+    height: 160px;
+    max-width: 100%;
+    margin: 0 auto 0.9rem;
+    background: var(--color-bg-subtle);
+    border: 1px dashed var(--color-border);
+    border-radius: 6px;
+    overflow: hidden;
+  }
+
+  .product-image img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+  }
+
+  .product-image-empty {
+    font-size: 0.78rem;
+    line-height: 1.6;
+    text-align: center;
+    color: var(--color-text-muted);
+  }
+
+  .product-maker {
+    margin: 0 0 0.2rem;
+    font-size: 0.78rem;
+    color: var(--color-text-muted);
+  }
+
+  /* 記事本文の h3（左の緑線）とは別物なので打ち消す */
+  .product-name {
+    margin: 0 0 0.6rem;
+    padding: 0;
+    border: none;
+    font-size: 1rem;
+    font-weight: 700;
+    line-height: 1.6;
+    color: var(--color-text);
+  }
+
+  .product-spec {
+    margin: 0;
+    padding: 0.6rem 0 0;
+    border-top: 1px solid var(--color-border);
+    list-style: none;
+    font-size: 0.875rem;
+    line-height: 1.7;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .product-spec li {
+    display: flex;
+    gap: 0.6em;
+  }
+
+  .spec-label {
+    flex: none;
+    width: 4em;
+    color: var(--color-text-muted);
+  }
+
+  .spec-value {
+    font-weight: 700;
+  }
+
+  /* 8商品すべて同じ扱いにするため、推薦色（緑）・警告色（オレンジ）は使わない */
+  .product-block {
+    margin-bottom: 0.75rem;
+    padding: 0.7rem 0.8rem;
+    background: var(--color-bg-subtle);
+    border-radius: 6px;
+    font-size: 0.85rem;
+    line-height: 1.7;
+  }
+
+  .product-block-title {
+    margin: 0 0 0.35rem;
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: var(--color-text-muted);
+  }
+
+  .product-block-body {
+    margin: 0 0 0.5rem;
+  }
+
+  .product-block-body:last-child {
+    margin-bottom: 0;
+  }
+
+  .product-cta {
+    display: block;
+    margin-top: auto;
+    padding: 0.7rem 0.9rem;
+    background: var(--color-primary);
+    color: #ffffff;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    font-weight: 700;
+    line-height: 1.5;
+    text-align: center;
+    text-decoration: none;
+  }
+
+  .product-cta:hover {
+    background: var(--color-primary-dark);
+    color: #ffffff;
+  }
+
+  /* リンク未設定のCTA枠であることが見て分かるようにする（プレビュー専用） */
+  .product-cta-placeholder {
+    background: var(--color-bg-subtle);
+    color: var(--color-text-muted);
+    border: 1px dashed var(--color-border);
+  }
+
+  .product-cta-placeholder small {
+    display: block;
+    font-size: 0.7rem;
+    font-weight: 400;
+  }
+
+  @media (max-width: 640px) {
+    .product-head {
+      display: flex;
+      gap: 0.9rem;
+      align-items: flex-start;
+    }
+
+    .product-image {
+      flex: none;
+      width: 104px;
+      height: 104px;
+      margin: 0;
+    }
+
+    .product-head-text {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .product-name {
+      font-size: 0.95rem;
+    }
+  }
+</style>
