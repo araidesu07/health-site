@@ -13,10 +13,15 @@
  *   stats       … 少数の数値を対比させる。グラフの前に結果を先に示すときに使う
  *   comparison-evidence … 何と何を比べた研究か、と報告された結果を文章で見せる。
  *                 数値・勝敗・強調は持たない（items の value / highlight は描画しない）
+ *   choice-nav  … 読者が自分に当てはまるものを選び、その節へ移動するための導線。
+ *                 項目は並列であり、順位・優劣を持たない。href を持つ項目だけリンクにする。
  *   comparison-table … 2つの対象を、同じ比較軸で並べる。表組みではなく左右のカードで描く。
  *                 制度・区分・条件の違いを事実として並べるためのもの。
  *                 2枚のカードは枠・背景・影をすべて同一にする。
  *                 列に強弱を付けない。◯×・順位・勝敗の記号は持たない（highlight を受け取らない）
+ *   check-map   … 「✓ 読者の状況 → 見るべき商品」の対応を短く並べる。結論を一目で拾わせるためのもの。
+ *                 ✓ は箇条書きの記号であり、推奨・効果保証の意味を持たせない。
+ *                 項目は並列で、順位・優劣を持たない（highlight は描画しない）。href を持つ項目は行ごとリンクにする。
  *
  * 装飾のための画像は持たない。写真・Before/After は扱わない。
  */
@@ -28,6 +33,8 @@ export interface IssueOneVisualItem {
   value?: string;
   /** 注目してほしい項目。1つの visual につき1つが原則 */
   highlight?: boolean;
+  /** choice-nav：この項目を押したときの移動先（同一ページ内のアンカー） */
+  href?: string;
 }
 
 /** comparison-table の1行。values は columns と同じ件数・同じ順序 */
@@ -37,8 +44,8 @@ export interface IssueOneVisualTableRow {
 }
 
 export interface IssueOneVisualData {
-  type?: 'key-benefit' | 'rating' | 'stats' | 'comparison-evidence' | 'comparison-table';
-  /** key-benefit / stats / comparison-evidence で並べる項目 */
+  type?: 'key-benefit' | 'rating' | 'stats' | 'comparison-evidence' | 'comparison-table' | 'choice-nav' | 'check-map';
+  /** key-benefit / stats / comparison-evidence / choice-nav で並べる項目 */
   items?: IssueOneVisualItem[];
   /** key-benefit / comparison-evidence：項目の間に挟む区切り記号。例：＋ ／ vs */
   connector?: string;
@@ -121,7 +128,67 @@ const tableRows = Array.isArray(data?.rows)
     )
   : [];
 const showTable = type === 'comparison-table' && columns.length >= 2 && tableRows.length > 0;
+const showChoiceNav = type === 'choice-nav' && items.length > 0;
+const showCheckMap = type === 'check-map' && items.length > 0;
 ---
+
+{showCheckMap && (
+  <div class="iov iov-check">
+    {caption && <p class="iov-check-caption">{caption}</p>}
+    <ul class="iov-check-list">
+      {items.map((item) => {
+        const href = typeof item.href === 'string' ? item.href.trim() : '';
+        const inner = (
+          <>
+            <svg class="iov-check-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+              <path d="M2.5 8.6l3.4 3.4L13.5 4.4" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+            <span class="iov-check-label">{item.label}</span>
+            {item.value && (
+              <span class="iov-check-value">
+                <span class="iov-check-arrow" aria-hidden="true">→</span>
+                <InlineText text={item.value} />
+              </span>
+            )}
+          </>
+        );
+        return (
+          <li class="iov-check-item">
+            {href ? <a class="iov-check-row" href={href}>{inner}</a> : <span class="iov-check-row">{inner}</span>}
+          </li>
+        );
+      })}
+    </ul>
+    {note && <p class="iov-note"><InlineText text={note} /></p>}
+  </div>
+)}
+
+{showChoiceNav && (
+  <div class="iov iov-nav">
+    {caption && <p class="iov-nav-caption">{caption}</p>}
+    <ul class="iov-nav-list">
+      {items.map((item) => {
+        const href = typeof item.href === 'string' ? item.href.trim() : '';
+        return (
+          <li class="iov-nav-item">
+            {href ? (
+              <a class="iov-nav-link" href={href}>
+                <span class="iov-nav-label">{item.label}</span>
+                {item.value && <span class="iov-nav-value">{item.value}</span>}
+              </a>
+            ) : (
+              <span class="iov-nav-link">
+                <span class="iov-nav-label">{item.label}</span>
+                {item.value && <span class="iov-nav-value">{item.value}</span>}
+              </span>
+            )}
+          </li>
+        );
+      })}
+    </ul>
+    {note && <p class="iov-note"><InlineText text={note} /></p>}
+  </div>
+)}
 
 {showKeyBenefit && (
   <div class="iov iov-benefit">
@@ -222,6 +289,143 @@ const showTable = type === 'comparison-table' && columns.length >= 2 && tableRow
 )}
 
 <style>
+  /* --- check-map：「✓ 状況 → 商品」の対応 ------------------------------ */
+
+  .iov-check {
+    margin: 1.2rem 0 0;
+  }
+
+  .iov-check-caption {
+    margin: 0 0 0.55rem;
+    color: var(--color-text-muted);
+    font-size: 0.8rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+  }
+
+  .iov-check-list {
+    display: grid;
+    gap: 0.5rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  /* 並列の対応。どの行も同じ枠・同じ背景にし、1行だけ目立たせない */
+  .iov-check-row {
+    display: grid;
+    grid-template-columns: 1.1rem minmax(0, 15em) minmax(0, 1fr);
+    align-items: baseline;
+    gap: 0.2rem 0.6rem;
+    padding: 0.7rem 0.95rem;
+    border: 1px solid var(--color-border-soft);
+    border-radius: var(--radius-md);
+    background: var(--color-bg-subtle);
+    color: var(--color-text);
+    text-decoration: none;
+    line-height: 1.6;
+  }
+
+  a.iov-check-row:hover {
+    border-color: var(--color-primary-border);
+    background: var(--color-primary-light);
+  }
+
+  .iov-check-icon {
+    align-self: center;
+    width: 1rem;
+    height: 1rem;
+    color: var(--color-accent);
+  }
+
+  .iov-check-label {
+    font-size: 0.95rem;
+    font-weight: 700;
+  }
+
+  .iov-check-value {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--color-primary-dark);
+    /* 商品名の途中で折り返さない（対応ブラウザのみ。非対応でも通常の折り返し） */
+    word-break: auto-phrase;
+  }
+
+  .iov-check-arrow {
+    margin-right: 0.4rem;
+    color: var(--color-text-faint);
+    font-weight: 400;
+  }
+
+  @media (max-width: 560px) {
+    /* 狭い画面では「状況」の下に「→ 商品」を置く */
+    .iov-check-row {
+      grid-template-columns: 1.1rem minmax(0, 1fr);
+      padding: 0.65rem 0.8rem;
+    }
+
+    .iov-check-value {
+      grid-column: 2;
+    }
+  }
+
+  /* --- choice-nav：悩み別の導線 --------------------------------------- */
+
+  .iov-nav {
+    margin: 1.1rem 0 0;
+  }
+
+  .iov-nav-caption {
+    margin: 0 0 0.6rem;
+    color: var(--color-text-muted);
+    font-size: 0.8rem;
+    font-weight: 700;
+  }
+
+  .iov-nav-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(10.5rem, 1fr));
+    gap: 0.7rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .iov-nav-item {
+    display: flex;
+  }
+
+  /* 並列の選択肢。1枚だけ目立たせない（枠・背景はすべて同一にする） */
+  .iov-nav-link {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    width: 100%;
+    padding: 0.95rem 1rem;
+    border: 1px solid var(--color-primary-border);
+    border-radius: var(--radius-md);
+    background: var(--color-bg);
+    color: var(--color-text);
+    text-decoration: none;
+    line-height: 1.6;
+  }
+
+  a.iov-nav-link:hover {
+    background: var(--color-primary-light);
+    border-color: var(--color-primary);
+  }
+
+  .iov-nav-label {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--color-primary-dark);
+  }
+
+  .iov-nav-value {
+    font-size: 0.82rem;
+    color: var(--color-text-muted);
+  }
+
   .iov {
     margin: 1.1rem 0 1.3rem;
   }

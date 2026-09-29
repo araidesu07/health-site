@@ -1,0 +1,153 @@
+---
+/**
+ * 最後の絞り込み（schema v4 / finalPick）
+ *
+ * 商品詳細を読んだあと、候補が複数残った読者が最後に1つへ絞るための枠。
+ * 使うのは**すでに記事に出ている事実だけ**（価格・剤形・買える場所など）。
+ *
+ * ここで新しい推薦・順位・スコアを作らない。軸ごとに「この条件ならこの商品」を
+ * 並べるだけで、商品同士の優劣は書かない（それは記事側の責務であり、表示層は枠だけ持つ）。
+ *
+ * 値が無ければ何も描画しない。finalPick を持たない既存記事の表示は変わらない。
+ */
+import InlineText from './InlineText.astro';
+import SectionHeader from './SectionHeader.astro';
+
+export interface FinalPickAxis {
+  /** 絞り込みの軸。例：続けやすい価格で選ぶ */
+  title?: string;
+  /** その軸の説明。1〜2文 */
+  text?: string;
+  /** その軸に該当する商品。「商品名｜補足」の形は使わず、記事側が1行で書く */
+  items?: string[];
+}
+
+export interface FinalPickData {
+  /** 見出し。記事側が決める */
+  title?: string;
+  /** 見出しの下に置く短い前置き */
+  lead?: string;
+  axes?: FinalPickAxis[];
+  /** 末尾に置く補足。1行程度 */
+  note?: string;
+}
+
+interface Props {
+  /** 記事 frontmatter の finalPick。空・未指定なら何も描画しない */
+  data?: FinalPickData;
+  /** 章の通し番号。ArticleLayout が渡す */
+  number?: string;
+}
+
+const { data, number } = Astro.props;
+
+const clean = (list?: string[]) =>
+  Array.isArray(list) ? list.filter((t) => typeof t === 'string' && t.trim() !== '') : [];
+
+const title = data?.title?.trim();
+const lead = data?.lead?.trim();
+const note = data?.note?.trim();
+
+const axes = Array.isArray(data?.axes)
+  ? data.axes.filter((a) => a && (Boolean(a.title?.trim()) || Boolean(a.text?.trim()) || clean(a.items).length > 0))
+  : [];
+
+const hasContent = axes.length > 0;
+---
+
+{hasContent && (
+  <section class="final-pick" id="final-pick" aria-label={title}>
+    <SectionHeader number={number} eyebrow="最後の絞り込み" title={title} />
+
+    {lead && <p class="final-pick-lead"><InlineText text={lead} /></p>}
+
+    <ul class="final-pick-axes">
+      {axes.map((axis) => (
+        <li class="final-pick-axis">
+          {axis.title?.trim() && <p class="final-pick-axis-title">{axis.title}</p>}
+          {axis.text?.trim() && <p class="final-pick-axis-text"><InlineText text={axis.text} /></p>}
+          {clean(axis.items).length > 0 && (
+            <ul class="final-pick-items">
+              {clean(axis.items).map((item) => <li><InlineText text={item} /></li>)}
+            </ul>
+          )}
+        </li>
+      ))}
+    </ul>
+
+    {note && <p class="final-pick-note"><InlineText text={note} /></p>}
+  </section>
+)}
+
+<style>
+  /* 色は global.css の :root 変数だけを使う。生の色コードは書かない */
+  .final-pick {
+    margin: 0 0 3.6rem;
+    scroll-margin-top: 1.5rem;
+  }
+
+  .final-pick-lead {
+    margin: 0 0 1.4rem;
+    line-height: 1.9;
+  }
+
+  .final-pick-axes {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+    gap: 1rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  /* 軸は並列。1枚だけ強調しない */
+  .final-pick-axis {
+    padding: 1.2rem 1.15rem 1.25rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    background: var(--color-bg);
+    box-shadow: var(--shadow-card);
+  }
+
+  .final-pick-axis-title {
+    margin: 0 0 0.5rem;
+    font-size: 0.98rem;
+    font-weight: 800;
+    line-height: 1.6;
+    color: var(--color-primary-dark);
+  }
+
+  .final-pick-axis-text {
+    margin: 0;
+    font-size: 0.9rem;
+    line-height: 1.85;
+    color: var(--color-text-muted);
+  }
+
+  .final-pick-items {
+    margin: 0.85rem 0 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .final-pick-items li {
+    padding: 0.55rem 0.7rem;
+    border-radius: var(--radius-sm);
+    background: var(--color-primary-light);
+    font-size: 0.88rem;
+    font-weight: 600;
+    line-height: 1.7;
+    color: var(--color-text);
+  }
+
+  .final-pick-items li + li {
+    margin-top: 0.45rem;
+  }
+
+  .final-pick-note {
+    margin: 1rem 0 0;
+    font-size: 0.78rem;
+    line-height: 1.7;
+    color: var(--color-text-muted);
+  }
+</style>

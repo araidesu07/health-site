@@ -12,9 +12,16 @@
  *
  * PC は比較表形式。狭い画面では横スクロールさせず、
  * 1商品＝1ブロックとして画像＋情報が縦に並ぶ形へ切り替える。
+ *
+ * v4 + cards（記事 frontmatter の comparisonStyle: "cards"）
+ *   比較をこのカードに集約する。1商品1カードに 商品名／一言特徴（keyPoint）／特徴（overview）
+ *   ／スペック（price・volume・supportingFacts）／買う前の注意（buyBeforeNotes）／CTA まで持たせ、
+ *   横長の数値表は描画しない（商品ごとの独立章も ArticleLayout 側で描画しない）。
+ *   PC は2列、狭い画面は1列で縦に読む。
  */
 import { toLargeImage } from './ProductCard.astro';
 import type { Product } from './ProductCard.astro';
+import AffiliateCTA from './AffiliateCTA.astro';
 import InlineText from './InlineText.astro';
 import SectionHeader from './SectionHeader.astro';
 
@@ -38,6 +45,8 @@ interface Props {
   lead?: string;
   /** schema v4 の描画にするか。ArticleLayout が渡す。既定は v3 描画 */
   v4?: boolean;
+  /** v4 のカード型比較にするか（comparisonStyle: "cards"）。ArticleLayout が渡す。既定 false */
+  cards?: boolean;
 }
 
 const {
@@ -46,7 +55,10 @@ const {
   note,
   lead,
   v4 = false,
+  cards: cardsProp = false,
 } = Astro.props;
+
+const cards = v4 && cardsProp;
 
 const noteText = typeof note === 'string' ? note.trim() : '';
 const leadText = typeof lead === 'string' ? lead.trim() : '';
@@ -130,6 +142,45 @@ function specValue(item: Product, label: string): string {
   const index = rows.indexOf(item);
   return (factMaps[index]?.get(label) ?? '').trim();
 }
+
+/* --- v4 + cards：1商品1カードに載せる値 ------------------------------ */
+const cleanList = (list?: string[]) =>
+  Array.isArray(list) ? list.filter((t) => typeof t === 'string' && t.trim() !== '') : [];
+
+/** カード内のスペック行。価格と内容量は1行にまとめ、残りは supportingFacts の並び順のまま */
+function cardSpecRows(item: Product): { label: string; value: string }[] {
+  const price = (item.price ?? '').trim();
+  const volume = (item.volume ?? '').trim();
+  const head =
+    price !== ''
+      ? [{ label: '価格', value: volume !== '' ? `${price}／${volume}` : price }]
+      : [];
+  const facts = cleanList(item.supportingFacts).map((line) => {
+    const at = line.search(SEPARATOR);
+    return at > 0
+      ? { label: line.slice(0, at).trim(), value: line.slice(at + 1).trim() }
+      : { label: '', value: line.trim() };
+  });
+  // 「向いている悩み」はカード上部の一言特徴の直後に読ませたいので先頭に寄せる
+  const concern = facts.filter((f) => f.label === '向いている悩み');
+  const rest = facts.filter((f) => f.label !== '向いている悩み');
+  return [...concern, ...head, ...rest];
+}
+
+/* forWhom を持つカードだけの並び。
+   「こんな人向け」が「向いている悩み」の役割を担うので、その行は表に重ねて出さない。
+   「主な成分」は表から出してカード上部に置き、残りの行は価格から順に並べる */
+const FORWHOM_LIFTED = ['向いている悩み', '主な成分'];
+function cardIngredient(item: Product): string {
+  return cardSpecRows(item).find((r) => r.label === '主な成分')?.value ?? '';
+}
+function cardSpecRowsCompact(item: Product): { label: string; value: string }[] {
+  return cardSpecRows(item).filter((r) => !FORWHOM_LIFTED.includes(r.label));
+}
+
+const cardBuyUrl = (p: Product) => ((p.affiliateUrl ?? p.url ?? '').trim() || undefined);
+const cardPixel = (p: Product) =>
+  typeof p.trackingPixel === 'string' && p.trackingPixel.trim() !== '' ? p.trackingPixel.trim() : undefined;
 ---
 
 {hasRows && (
@@ -140,7 +191,139 @@ function specValue(item: Product, label: string): string {
     {leadText && <p class="rec-summary-lead"><InlineText text={leadText} /></p>}
 
     {/* v4：まず画像＋商品名＋主な違いを数秒で掴ませ、数字の比較はそのあとに置く */}
-    {v4 && (
+    {/* v4 + cards：比較の中心。特徴・スペック・CTA までこのカードで完結させる */}
+    {cards && (
+      <ol class="rec-rich">
+        {rows.map((item, i) => {
+          const src = imageOf(item);
+          const overview = cleanList(item.overview);
+          const specs = cardSpecRows(item);
+          const notes = cleanList(item.buyBeforeNotes);
+          const href = cardBuyUrl(item);
+          const label = (item.affiliateLabel ?? '').trim() || 'この商品をチェック';
+          const pixel = cardPixel(item);
+          const forWhom = cleanList(item.forWhom);
+          if (forWhom.length > 0) {
+            const ingredient = cardIngredient(item);
+            const compactSpecs = cardSpecRowsCompact(item);
+            return (
+              <li class="rec-rich-card" id={`product-${i + 1}`}>
+                <div class="rec-rich-head">
+                  {src && (
+                    <span class="rec-rich-thumb">
+                      <img src={src} alt={item.name} loading="lazy" decoding="async" />
+                    </span>
+                  )}
+                  <div>
+                    {item.maker && <p class="rec-rich-maker">{item.maker}</p>}
+                    <h3 class="rec-rich-name">{item.name}</h3>
+                  </div>
+                </div>
+                {item.keyPoint && <p class="rec-rich-key">{item.keyPoint}</p>}
+                <div class="rec-rich-block rec-rich-for">
+                  <p class="rec-rich-label">こんな人向け</p>
+                  <ul class="rec-rich-checks">
+                    {forWhom.map((line) => (
+                      <li>
+                        <svg class="rec-rich-check" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+                          <path d="M2.5 8.6l3.4 3.4L13.5 4.4" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" />
+                        </svg>
+                        <span><InlineText text={line} /></span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+                {ingredient && (
+                  <p class="rec-rich-ingredient">
+                    <span class="rec-rich-label">主な成分</span>
+                    <span class="rec-rich-ingredient-value"><InlineText text={ingredient} /></span>
+                  </p>
+                )}
+                {overview.length > 0 && (
+                  <div class="rec-rich-block">
+                    <p class="rec-rich-label">商品の特徴</p>
+                    {overview.map((text) => <p class="rec-rich-text"><InlineText text={text} /></p>)}
+                  </div>
+                )}
+                {compactSpecs.length > 0 && (
+                  <dl class="rec-rich-specs">
+                    {compactSpecs.map((row) => (
+                      <div class="rec-rich-spec">
+                        {row.label && <dt>{row.label}</dt>}
+                        <dd><InlineText text={row.value} /></dd>
+                      </div>
+                    ))}
+                  </dl>
+                )}
+                {notes.length > 0 && (
+                  <ul class="rec-rich-notes">
+                    {notes.map((line) => <li><InlineText text={line} /></li>)}
+                  </ul>
+                )}
+                {href && (
+                  <p class="rec-rich-cta">
+                    <AffiliateCTA
+                      url={href}
+                      label={label}
+                      provider={item.affiliateProvider}
+                      variant="full"
+                      ariaLabel={`${item.name}｜${label}（外部サイト）`}
+                    />
+                  </p>
+                )}
+                {pixel && <img class="rec-rich-pixel" src={pixel} width="1" height="1" alt="" aria-hidden="true" />}
+              </li>
+            );
+          }
+          return (
+            <li class="rec-rich-card" id={`product-${i + 1}`}>
+              <div class="rec-rich-head">
+                {src && (
+                  <span class="rec-rich-thumb">
+                    <img src={src} alt={item.name} loading="lazy" decoding="async" />
+                  </span>
+                )}
+                <div>
+                  {item.maker && <p class="rec-rich-maker">{item.maker}</p>}
+                  <h3 class="rec-rich-name">{item.name}</h3>
+                </div>
+              </div>
+              {item.keyPoint && <p class="rec-rich-key">{item.keyPoint}</p>}
+              {overview.map((text) => <p class="rec-rich-text"><InlineText text={text} /></p>)}
+              {specs.length > 0 && (
+                <dl class="rec-rich-specs">
+                  {specs.map((row) => (
+                    <div class="rec-rich-spec">
+                      {row.label && <dt>{row.label}</dt>}
+                      <dd><InlineText text={row.value} /></dd>
+                    </div>
+                  ))}
+                </dl>
+              )}
+              {notes.length > 0 && (
+                <ul class="rec-rich-notes">
+                  {notes.map((line) => <li><InlineText text={line} /></li>)}
+                </ul>
+              )}
+              {href && (
+                <p class="rec-rich-cta">
+                  <AffiliateCTA
+                    url={href}
+                    label={label}
+                    provider={item.affiliateProvider}
+                    variant="full"
+                    ariaLabel={`${item.name}｜${label}（外部サイト）`}
+                  />
+                </p>
+              )}
+              {pixel && <img class="rec-rich-pixel" src={pixel} width="1" height="1" alt="" aria-hidden="true" />}
+            </li>
+          );
+        })}
+      </ol>
+    )}
+
+    {v4 && !cards && (
       <ul class="rec-cards">
         {rows.map((item) => {
           const src = imageOf(item);
@@ -166,7 +349,7 @@ function specValue(item: Product, label: string): string {
     )}
 
     {/* v4：全商品が同じ項目を持つときだけ列にする。空欄の出る項目は表に載せない */}
-    {v4 && specColumns.length > 0 && (
+    {v4 && !cards && specColumns.length > 0 && (
       <details class="rec-table" open>
         <summary>数字で並べて見る</summary>
         <div class="rec-table-scroll">
@@ -258,6 +441,208 @@ function specValue(item: Product, label: string): string {
 )}
 
 <style>
+  /* --- v4 + cards：1商品1カードの比較 ----------------------------------- */
+
+  /* PC は2列。狭い画面では1列にして、横スクロールさせない */
+  .rec-rich {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(19rem, 1fr));
+    gap: 1.2rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .rec-rich-card {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    padding: 1.2rem 1.15rem 1.25rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    background: var(--color-bg);
+    box-shadow: var(--shadow-card);
+    scroll-margin-top: 1.5rem;
+  }
+
+  .rec-rich-head {
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+    margin-bottom: 0.7rem;
+  }
+
+  .rec-rich-thumb {
+    flex: none;
+    display: grid;
+    place-items: center;
+    width: 72px;
+    height: 72px;
+    border-radius: var(--radius-md);
+    background: var(--color-bg-subtle);
+  }
+
+  .rec-rich-thumb img {
+    max-width: 64px;
+    max-height: 64px;
+    mix-blend-mode: multiply;
+  }
+
+  .rec-rich-maker {
+    margin: 0;
+    color: var(--color-text-faint);
+    font-size: 0.74rem;
+    line-height: 1.5;
+  }
+
+  .rec-rich-name {
+    margin: 0.1rem 0 0;
+    font-size: 1rem;
+    font-weight: 800;
+    line-height: 1.5;
+    color: var(--color-primary-dark);
+  }
+
+  .rec-rich-key {
+    margin: 0 0 0.8rem;
+    padding: 0.55rem 0.75rem;
+    border-radius: var(--radius-sm);
+    background: var(--color-primary-light);
+    color: var(--color-primary-dark);
+    font-size: 0.86rem;
+    font-weight: 700;
+    line-height: 1.6;
+  }
+
+  .rec-rich-text {
+    margin: 0 0 0.6rem;
+    font-size: 0.88rem;
+    line-height: 1.85;
+  }
+
+  /* --- forWhom を持つカードだけの部品 --- */
+
+  .rec-rich-block {
+    margin: 0 0 0.85rem;
+  }
+
+  /* 情報の役割を示す小ラベル。本文より小さく、色だけで区別する */
+  .rec-rich-label {
+    margin: 0 0 0.3rem;
+    color: var(--color-accent);
+    font-size: 0.74rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+  }
+
+  .rec-rich-for {
+    padding: 0.7rem 0.8rem 0.65rem;
+    border: 1px solid var(--color-border-soft);
+    border-radius: var(--radius-sm);
+    background: var(--color-bg-subtle);
+  }
+
+  .rec-rich-checks {
+    display: grid;
+    gap: 0.25rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .rec-rich-checks li {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.45rem;
+    font-size: 0.9rem;
+    font-weight: 700;
+    line-height: 1.65;
+  }
+
+  .rec-rich-check {
+    flex: none;
+    width: 0.9rem;
+    height: 0.9rem;
+    margin-top: 0.38em;
+    color: var(--color-accent);
+  }
+
+  .rec-rich-ingredient {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.1rem 0.7rem;
+    margin: 0 0 0.85rem;
+    padding-bottom: 0.7rem;
+    border-bottom: 1px solid var(--color-border-soft);
+  }
+
+  .rec-rich-ingredient .rec-rich-label {
+    margin: 0;
+  }
+
+  .rec-rich-ingredient-value {
+    font-size: 0.95rem;
+    font-weight: 800;
+    color: var(--color-text);
+  }
+
+  .rec-rich-block .rec-rich-text:last-child {
+    margin-bottom: 0;
+  }
+
+  .rec-rich-specs {
+    margin: 0.4rem 0 0.9rem;
+    border-top: 1px solid var(--color-border-soft);
+    font-size: 0.82rem;
+  }
+
+  .rec-rich-spec {
+    display: grid;
+    grid-template-columns: 7.4em 1fr;
+    gap: 0 0.6rem;
+    padding: 0.45rem 0;
+    border-bottom: 1px solid var(--color-border-soft);
+  }
+
+  .rec-rich-spec dt {
+    color: var(--color-text-muted);
+    font-weight: 600;
+    line-height: 1.6;
+  }
+
+  .rec-rich-spec dd {
+    margin: 0;
+    font-weight: 600;
+    line-height: 1.6;
+    overflow-wrap: break-word;
+  }
+
+  .rec-rich-notes {
+    margin: 0 0 0.9rem;
+    padding: 0;
+    list-style: none;
+    color: var(--color-text-muted);
+    font-size: 0.76rem;
+    line-height: 1.7;
+  }
+
+  .rec-rich-notes li::before {
+    content: '※';
+  }
+
+  /* CTA はカードの下端にそろえる */
+  .rec-rich-cta {
+    margin: auto 0 0;
+  }
+
+  .rec-rich-pixel {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+  }
+
   /* --- v4：商品サマリーカード ------------------------------------------ */
 
   .rec-cards {

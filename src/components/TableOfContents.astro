@@ -30,8 +30,14 @@ interface Props {
   products?: Product[];
   /** ざっくり比較の見出し。RecommendationSummary と揃える */
   summaryHeading?: string;
+  /** v4：商品詳細をまとめる章の見出し（記事 frontmatter の productsHeading）。無ければ載せない */
+  productsHeading?: string;
+  /** v4：最後の絞り込みの見出し（記事 frontmatter の finalPick.title）。無ければ載せない */
+  finalPickHeading?: string;
   /** 見出し文言。通常は変えない */
   heading?: string;
+  /** 商品名を1件ずつ目次に並べるか。v4 のカード型比較では false（大項目だけにする）。既定 true */
+  showProductItems?: boolean;
   /** schema v4 か。見出し文言を RecommendationSummary と揃えるために使う */
   v4?: boolean;
 }
@@ -41,6 +47,9 @@ const {
   issueOne,
   products = [],
   summaryHeading: summaryHeadingProp,
+  productsHeading,
+  finalPickHeading,
+  showProductItems = true,
   heading = '目次',
   v4 = false,
 } = Astro.props;
@@ -68,9 +77,19 @@ if (showIssueOne) {
 
 if (productItems.length > 0) {
   items.push({ href: '#recommendations', label: summaryHeading });
-  productItems.forEach((product, i) => {
-    items.push({ href: `#product-${i + 1}`, label: product.name });
-  });
+  // 商品詳細に章見出しがある記事では、その見出しを1行置いてから各商品を並べる
+  if ((productsHeading ?? '').trim() !== '') {
+    items.push({ href: '#products', label: productsHeading!.trim() });
+  }
+  if (showProductItems) {
+    productItems.forEach((product, i) => {
+      items.push({ href: `#product-${i + 1}`, label: product.name });
+    });
+  }
+}
+
+if ((finalPickHeading ?? '').trim() !== '') {
+  items.push({ href: '#final-pick', label: finalPickHeading!.trim() });
 }
 
 const hasItems = items.length > 0;

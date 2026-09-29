@@ -27,6 +27,11 @@ import KeyPoint from './KeyPoint.astro';
  */
 export interface IssueOneBlock {
   title?: string;
+  /**
+   * 小見出しに付ける id。ページ内の導線（conclusion.visual の choice-nav 等）から
+   * このブロックへ飛ぶときだけ指定する。未指定なら id を付けない。
+   */
+  id?: string;
   paragraphs?: string[];
   visual?: IssueOneVisualData | null;
   dataComparison?: DataComparisonData | null;
@@ -57,7 +62,39 @@ export interface IssueOneBlock {
    * 未指定なら既定の順序（keyPoint → terms → visual → paragraphs → lists → dataComparison）。
    * 並べ替えるだけで、内容・デザインは変えない。既存記事は未指定なので表示は変わらない。
    */
-  order?: ('keyPoint' | 'terms' | 'visual' | 'paragraphs' | 'lists' | 'dataComparison')[];
+  order?: (
+    | 'keyPoint'
+    | 'terms'
+    | 'visual'
+    | 'paragraphs'
+    | 'lists'
+    | 'dataComparison'
+    | 'intro'
+    | 'points'
+    | 'candidates'
+  )[];
+  /**
+   * ブロック冒頭の短い導入（1〜2文）。通常の段落より一段強く見せる。
+   * order に 'intro' を入れた記事だけが使う。未指定なら描画しない。
+   */
+  intro?: string;
+  /**
+   * 流し読みで拾わせたい要点。✓ 付きの短い箇条書きで見せる。
+   * ✓ は箇条書きの記号であり、推奨・効果保証の意味を持たせない。
+   */
+  points?: { title?: string; items?: string[] } | null;
+  /**
+   * そのブロックで見る候補商品。本文にすでにある商品名・条件を、商品ごとの行にして見せる。
+   * when（どんなときに見るか）・note（成分など）は記事本文の言い換えに限る。
+   * 行は並列で、順位・優劣を持たない。text はグループの説明文（段落）。
+   */
+  candidates?: {
+    title?: string;
+    /** 行の前に置く一文。text は行の後に置く */
+    lead?: string;
+    items?: { name?: string; when?: string; note?: string; href?: string }[];
+    text?: string[];
+  }[];
   /**
    * variant: 'summary' のとき、同じカードの中に続けて置く次の見出しと一文。
    * 章の結論から次の章へ渡すためのもの。
@@ -74,6 +111,10 @@ export interface IssueOneData {
   supportingFacts?: string[];
   medicalBoundary?: string;
   dataComparison?: DataComparisonData | null;
+  /** 見出し直下に置く通常のリード文（カードにしない）。未指定なら描画しない */
+  lead?: string;
+  /** リード文の直後に小さく置く補足（前提の注記など）。未指定なら描画しない */
+  leadNote?: string;
 
   /* --- temporary compatibility ------------------------------------------
      公開中の旧 v3 記事を再生成するまでの一時措置。旧契約のキーであり、
@@ -158,12 +199,17 @@ const whoShouldBuy =
 const supplementalFacts = clean(data?.supplementalFacts);
 
 const hasContent = hasIssueOneContent(data);
+const lead = typeof data?.lead === 'string' ? data.lead.trim() : '';
+const leadNote = typeof data?.leadNote === 'string' ? data.leadNote.trim() : '';
 ---
 
 {hasContent && (
   <section class="issue-one" id="issue-one" aria-label={title}>
     {/* 番号・小ラベルは記事構造から決まる値。記事 frontmatter からは受け取らない */}
     <SectionHeader number="01" eyebrow="このカテゴリについて" title={title} />
+
+    {lead && <p class="issue-one-lead"><InlineText text={lead} /></p>}
+    {leadNote && <p class="issue-one-lead-note"><InlineText text={leadNote} /></p>}
 
     {/* temporary compatibility：旧 v3 記事の supplementalFacts。新規記事では空 */}
     {supplementalFacts.map((text) => <p class="issue-one-text"><InlineText text={text} /></p>)}
@@ -189,13 +235,84 @@ const hasContent = hasIssueOneContent(data);
         </aside>
       ) : (
         <div class="issue-one-block">
-          {block.title?.trim() && <h3 class="issue-one-block-title">{block.title}</h3>}
+          {block.title?.trim() && (
+            <h3 class="issue-one-block-title" id={block.id?.trim() || undefined}>{block.title}</h3>
+          )}
 
           {(Array.isArray(block.order) && block.order.length > 0
             ? block.order
             : DEFAULT_BLOCK_ORDER
           ).map((part) => (
             <>
+              {part === 'intro' && block.intro?.trim() && (
+                <p class="issue-one-intro"><InlineText text={block.intro} /></p>
+              )}
+
+              {part === 'points' && block.points && clean(block.points.items).length > 0 && (
+                <div class="issue-one-points">
+                  {block.points.title?.trim() && (
+                    <p class="issue-one-points-title">{block.points.title}</p>
+                  )}
+                  <ul>
+                    {clean(block.points.items).map((item) => (
+                      <li>
+                        <svg class="issue-one-check" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+                          <path d="M2.5 8.6l3.4 3.4L13.5 4.4" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" />
+                        </svg>
+                        <span><InlineText text={item} /></span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {part === 'candidates' &&
+                (block.candidates ?? []).map((group) => {
+                  const rows = (group?.items ?? []).filter((c) => c?.name?.trim());
+                  const texts = clean(group?.text);
+                  const groupLead = group?.lead?.trim();
+                  return (rows.length > 0 || texts.length > 0) && (
+                    <div class="issue-one-candidates">
+                      {group.title?.trim() && (
+                        <p class="issue-one-candidates-title">{group.title}</p>
+                      )}
+                      {groupLead && (
+                        <p class="issue-one-candidates-text"><InlineText text={groupLead} /></p>
+                      )}
+                      {rows.length > 0 && (
+                        <ul class="issue-one-candidate-list">
+                          {rows.map((c) => {
+                            const href = c.href?.trim();
+                            const body = (
+                              <>
+                                {c.when?.trim() && (
+                                  <span class="issue-one-candidate-when">{c.when}</span>
+                                )}
+                                <span class="issue-one-candidate-name">{c.name}</span>
+                                {c.note?.trim() && (
+                                  <span class="issue-one-candidate-note">{c.note}</span>
+                                )}
+                              </>
+                            );
+                            return (
+                              <li>
+                                {href ? (
+                                  <a class="issue-one-candidate" href={href}>{body}</a>
+                                ) : (
+                                  <span class="issue-one-candidate">{body}</span>
+                                )}
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      )}
+                      {texts.map((text) => (
+                        <p class="issue-one-candidates-text"><InlineText text={text} /></p>
+                      ))}
+                    </div>
+                  );
+                })}
+
               {part === 'keyPoint' && <KeyPoint data={block.keyPoint ?? undefined} />}
 
               {part === 'terms' &&
@@ -272,6 +389,19 @@ const hasContent = hasIssueOneContent(data);
   .issue-one-text {
     margin: 0 0 1.15rem;
     line-height: 1.9;
+  }
+
+  /* 見出し直下のリード文。カードにせず地の文として置く */
+  .issue-one-lead {
+    margin: 0 0 0.4rem;
+    line-height: 1.9;
+  }
+
+  .issue-one-lead-note {
+    margin: 0 0 1.4rem;
+    color: var(--color-text-muted);
+    font-size: 0.78rem;
+    line-height: 1.7;
   }
 
   /* 主要ブロックは白カードとして軽く浮かせる。地の白との差は border と影で作る */
@@ -408,6 +538,128 @@ const hasContent = hasIssueOneContent(data);
     font-size: 0.9rem;
     line-height: 1.75;
     color: var(--color-text);
+  }
+
+  /* --- intro / points / candidates（order で指定した記事だけが使う） --- */
+
+  /* ブロック冒頭の導入。本文より一段だけ強くし、悩みの確認として読ませる */
+  .issue-one-intro {
+    margin: 0 0 1rem;
+    font-size: 1.02rem;
+    font-weight: 700;
+    line-height: 1.85;
+    color: var(--color-text);
+  }
+
+  /* 要点。枠は淡色の線だけで、本文より目立たせすぎない */
+  .issue-one-points {
+    margin: 0 0 1.2rem;
+    padding: 0.9rem 1rem 0.8rem;
+    border: 1px solid var(--color-primary-border);
+    border-radius: var(--radius-md);
+    background: var(--color-primary-light);
+  }
+
+  .issue-one-points-title {
+    margin: 0 0 0.45rem;
+    color: var(--color-primary);
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+  }
+
+  .issue-one-points ul {
+    display: grid;
+    gap: 0.35rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .issue-one-points li {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+    font-size: 0.95rem;
+    line-height: 1.75;
+  }
+
+  .issue-one-check {
+    flex: none;
+    width: 0.95rem;
+    height: 0.95rem;
+    margin-top: 0.42em;
+    color: var(--color-accent);
+  }
+
+  /* 候補商品。行は並列で、どの行も同じ枠にする */
+  .issue-one-candidates {
+    margin: 1.3rem 0 0;
+    padding-top: 1.1rem;
+    border-top: 1px dashed var(--color-border);
+  }
+
+  .issue-one-candidates-title {
+    margin: 0 0 0.6rem;
+    padding-left: 0.7rem;
+    border-left: 3px solid var(--color-accent);
+    font-size: 0.95rem;
+    font-weight: 800;
+    line-height: 1.6;
+    color: var(--color-primary-dark);
+  }
+
+  .issue-one-candidate-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+    gap: 0.55rem;
+    margin: 0 0 0.9rem;
+    padding: 0;
+    list-style: none;
+  }
+
+  .issue-one-candidate-list li {
+    display: flex;
+  }
+
+  .issue-one-candidate {
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+    width: 100%;
+    padding: 0.7rem 0.9rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    background: var(--color-bg);
+    color: var(--color-text);
+    text-decoration: none;
+    line-height: 1.55;
+  }
+
+  a.issue-one-candidate:hover {
+    border-color: var(--color-primary-border);
+    background: var(--color-primary-light);
+  }
+
+  .issue-one-candidate-when {
+    color: var(--color-text-muted);
+    font-size: 0.8rem;
+  }
+
+  .issue-one-candidate-name {
+    font-size: 0.98rem;
+    font-weight: 800;
+    color: var(--color-primary-dark);
+  }
+
+  .issue-one-candidate-note {
+    color: var(--color-text-muted);
+    font-size: 0.82rem;
+  }
+
+  .issue-one-candidates-text {
+    margin: 0 0 0.8rem;
+    line-height: 1.9;
   }
 
   /* 見出し付きの箇条書き。条件を1件ずつ縦に読ませる */

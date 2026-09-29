@@ -28,6 +28,9 @@ import ProductSection from '../components/ProductSection.astro';
 import TableOfContents from '../components/TableOfContents.astro';
 import SourceList from '../components/SourceList.astro';
 import PurchaseNotes from '../components/PurchaseNotes.astro';
+import FinalPick from '../components/FinalPick.astro';
+import SectionHeader from '../components/SectionHeader.astro';
+import type { FinalPickData } from '../components/FinalPick.astro';
 import type { Product } from '../components/ProductCard.astro';
 import type { IssueOneData } from '../components/IssueOneSection.astro';
 import type { IssueOneVisualData } from '../components/IssueOneVisual.astro';
@@ -131,11 +134,38 @@ const comparisonLead: string | undefined =
     ? frontmatter.comparisonLead.trim()
     : undefined;
 
+/* v4：商品詳細をまとめる章の見出し。未指定なら章見出しを描画しない（既存記事の表示は変わらない）。
+   商品ごとの独立章はこの見出しの下に続く */
+const productsHeading: string | undefined =
+  isV4 && typeof frontmatter.productsHeading === 'string' && frontmatter.productsHeading.trim() !== ''
+    ? frontmatter.productsHeading.trim()
+    : undefined;
+
+/* v4：商品詳細のあとに置く最後の絞り込み（finalPick）。
+   記事にすでに出ている事実だけで候補を1つに絞るための章。未指定なら描画しない */
+const finalPick: FinalPickData | undefined =
+  isV4 && frontmatter.finalPick && typeof frontmatter.finalPick === 'object'
+    ? (frontmatter.finalPick as FinalPickData)
+    : undefined;
+
+/* v4：購入・使用前の注意の見出し。未指定なら PurchaseNotes の既定文言のまま */
+const purchaseNotesHeading: string | undefined =
+  isV4 &&
+  typeof frontmatter.purchaseNotesHeading === 'string' &&
+  frontmatter.purchaseNotesHeading.trim() !== ''
+    ? frontmatter.purchaseNotesHeading.trim()
+    : undefined;
+
 /* v4：比較表の見出し。未指定なら既定（「N商品の違いを比較」）。目次の文言も同じ値にそろえる */
 const comparisonHeading: string | undefined =
   isV4 && typeof frontmatter.comparisonHeading === 'string' && frontmatter.comparisonHeading.trim() !== ''
     ? frontmatter.comparisonHeading.trim()
     : undefined;
+
+/* v4：comparisonStyle: "cards" の記事だけ、比較を「1商品1カード」に集約する。
+   カードに特徴・スペック・CTA までを持たせ、横長の比較表と商品ごとの独立章は描画しない。
+   目次も大項目だけにする。未指定の記事（既存記事すべて）の表示は変わらない */
+const cardComparison = isV4 && frontmatter.comparisonStyle === 'cards';
 
 const datePublished = toISODate(frontmatter.datePublished);
 const dateModified = toISODate(frontmatter.dateModified) ?? datePublished;
@@ -195,19 +225,38 @@ const jsonLd = {
           visual={conclusionVisual}
         />
 
-        <TableOfContents issueOne={issueOne} issueOneTitle={issueOne?.title} products={products} summaryHeading={comparisonHeading} v4={isV4} />
+        <TableOfContents
+          issueOne={issueOne}
+          issueOneTitle={issueOne?.title}
+          products={products}
+          summaryHeading={comparisonHeading}
+          productsHeading={cardComparison ? undefined : productsHeading}
+          showProductItems={!cardComparison}
+          finalPickHeading={finalPick?.title}
+          v4={isV4}
+        />
 
         <IssueOneSection data={issueOne} />
 
-        <RecommendationSummary items={products} lead={comparisonLead} heading={comparisonHeading} v4={isV4} />
+        <RecommendationSummary items={products} lead={comparisonLead} heading={comparisonHeading} v4={isV4} cards={cardComparison} />
+
+        {/* v4：商品詳細に章見出しを置く記事だけ。番号・小ラベルは記事構造から決まる値 */}
+        {!cardComparison && productsHeading && (
+          <div id="products" class="products-heading">
+            <SectionHeader number="03" eyebrow="商品ごとの詳細" title={productsHeading} />
+          </div>
+        )}
 
         {/* v3/v4 とも商品ごとに全幅の独立章。カードグリッドで横並びにしない */}
-        {(products ?? []).map((product, i) => (
+        {!cardComparison && (products ?? []).map((product, i) => (
           <ProductSection {...product} index={i + 1} v4={isV4} />
         ))}
 
+        {/* v4：候補が複数残った読者が最後に1つへ絞るための章。新しい推薦は作らない */}
+        <FinalPick data={finalPick} number={productsHeading && !cardComparison ? '04' : '03'} />
+
         {/* v4：安全情報は本文で展開せず、ここに最小限だけ集約する */}
-        <PurchaseNotes items={purchaseNotes} />
+        <PurchaseNotes items={purchaseNotes} heading={purchaseNotesHeading} />
 
         {priceNote && <p class="article-price-note"><InlineText text={priceNote} /></p>}
 
@@ -234,6 +283,12 @@ const jsonLd = {
 </Layout>
 
 <style>
+  /* 商品詳細の章見出し。直後の商品セクションと離れすぎないようにする */
+  .products-heading {
+    margin: 0 0 1.5rem;
+    scroll-margin-top: 1.5rem;
+  }
+
   /* 注釈。本文より小さく、控えめな色で置く */
   .article-price-note {
     margin: 2.5rem 0 0;
