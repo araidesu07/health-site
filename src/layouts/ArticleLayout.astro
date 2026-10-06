@@ -260,8 +260,6 @@ const jsonLd = {
 
         {priceNote && <p class="article-price-note"><InlineText text={priceNote} /></p>}
 
-        <SourceList items={sources} />
-
         <slot />
       </>
     ) : (
@@ -279,6 +277,9 @@ const jsonLd = {
         <slot />
       </>
     )}
+
+    {/* 出典は schemaVersion に依存せず、本文の後に表示する */}
+    {Array.isArray(sources) && sources.length > 0 && <SourceList items={sources} />}
   </article>
 </Layout>
 
