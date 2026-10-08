@@ -5,3 +5,8 @@
 # ミノキシジル記事のカテゴリを skincare から otc へ変更（2026-09-17）。
 # 旧URLは公開済みのため、404 にせず新URLへ恒久的に転送する。
 /skincare/minoxidil-5-otc/ /otc/minoxidil-5-otc/ 301
+
+# 旧ミノキシジル比較記事を削除（2026-10-08）。
+# 同じ検索意図（市販ミノキシジル5%のどれを買うか）を扱う現行記事へ恒久的に転送する。
+/skincare/minoxidil-5-comparison/ /otc/minoxidil-5-otc/ 301
+/skincare/minoxidil-5-comparison /otc/minoxidil-5-otc/ 301

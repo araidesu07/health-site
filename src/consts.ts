@@ -15,3 +15,16 @@ export const FOOTER_LINKS = [
   { href: '/privacy/', label: 'プライバシーポリシー' },
   { href: '/disclaimer/', label: '免責事項' },
 ];
+
+/**
+ * 検索エンジンに載せないページ（プレビュー）。
+ * 本番用ビルドでは astro.config.mjs が dist から削除するため、本番には存在しない。
+ * Validator 用ビルド・ローカル開発では残るので、念のため noindex を出し sitemap から除外する。
+ */
+const NOINDEX_PATH_PREFIXES = ['/preview/'];
+
+/** pathname が noindex 対象か（末尾スラッシュの有無は問わない） */
+export function isNoindexPath(pathname: string): boolean {
+  const path = pathname.endsWith('/') ? pathname : `${pathname}/`;
+  return NOINDEX_PATH_PREFIXES.some((prefix) => path.startsWith(prefix));
+}
