@@ -63,6 +63,9 @@ function formatJa(iso: string): string {
 const title = frontmatter.title ?? '記事';
 const description = frontmatter.description;
 const author = frontmatter.author ?? DEFAULT_AUTHOR;
+/* 著者欄の見出し（既定「著者」）と資格（例：薬剤師）。frontmatter に無い既存記事は従来表示のまま */
+const authorLabel: string = frontmatter.authorLabel ?? '著者';
+const authorRole: string | undefined = frontmatter.authorRole;
 const isAffiliate = frontmatter.affiliate === true;
 
 /* v2 の記事順序に沿って、本文の前に置く構成要素。
@@ -182,7 +185,7 @@ const jsonLd = {
   ...(description ? { description } : {}),
   ...(datePublished ? { datePublished } : {}),
   ...(dateModified ? { dateModified } : {}),
-  author: { '@type': 'Person', name: author },
+  author: { '@type': 'Person', name: author, ...(authorRole ? { jobTitle: authorRole } : {}) },
   publisher: { '@type': 'Organization', name: SITE_NAME },
   ...(canonicalURL ? { mainEntityOfPage: canonicalURL } : {}),
 };
@@ -204,7 +207,7 @@ const jsonLd = {
     )}
 
     <p class="article-meta">
-      <span class="author">著者：{author}</span>
+      <span class="author">{authorLabel}：{author}{authorRole && `（${authorRole}）`}</span>
       {datePublished && (
         <span>
           公開日：<time datetime={datePublished}>{formatJa(datePublished)}</time>
