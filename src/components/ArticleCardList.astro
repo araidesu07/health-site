@@ -1,0 +1,93 @@
+---
+/**
+ * カテゴリ一覧の記事カード（サムネイル＋タイトル＋説明）。
+ * /supplement/ と /otc/ で使う。
+ *
+ * サムネイルは consts.ts の thumbnailFor() から引く。登録の無い記事は画像なしで表示する。
+ * 画像には width / height を付け、読み込み前から 1200:630 の枠を確保する（表示のずれを防ぐ）。
+ */
+import { THUMBNAIL_SIZE, thumbnailFor } from '../consts';
+
+export interface ArticleCardItem {
+  href: string;
+  title: string;
+  description: string;
+}
+
+interface Props {
+  items: ArticleCardItem[];
+}
+
+const { items } = Astro.props;
+---
+
+<ul class="article-cards">
+  {items.map((item) => {
+    const image = thumbnailFor(item.href);
+    return (
+      <li class="article-card">
+        <a class="article-card-link" href={item.href}>
+          {image && (
+            <img
+              class="article-card-image"
+              src={image}
+              alt=""
+              width={THUMBNAIL_SIZE.width}
+              height={THUMBNAIL_SIZE.height}
+              loading="lazy"
+              decoding="async"
+            />
+          )}
+          <span class="article-card-title">{item.title}</span>
+        </a>
+        <p class="article-card-description">{item.description}</p>
+      </li>
+    );
+  })}
+</ul>
+
+<style>
+  .article-cards {
+    list-style: none;
+    margin: 2rem 0 0;
+    padding: 0;
+    display: grid;
+    gap: 2.5rem;
+  }
+
+  .article-card {
+    margin: 0;
+  }
+
+  /* 画像とタイトルを1つのリンクにする（どちらを押しても記事へ） */
+  .article-card-link {
+    display: block;
+    text-decoration: none;
+  }
+
+  .article-card-image {
+    display: block;
+    width: 100%;
+    height: auto;
+    aspect-ratio: 1200 / 630;
+    border: 1px solid var(--color-border-soft);
+    border-radius: var(--radius-md);
+  }
+
+  .article-card-title {
+    display: block;
+    margin-top: 0.9rem;
+    font-weight: 700;
+    line-height: 1.6;
+    text-decoration: underline;
+    text-underline-offset: 0.2em;
+    text-decoration-thickness: 1px;
+  }
+
+  .article-card-description {
+    margin: 0.5rem 0 0;
+    font-size: 0.92rem;
+    line-height: 1.8;
+    color: var(--color-text-muted);
+  }
+</style>

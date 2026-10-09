@@ -6,6 +6,7 @@
  * 記事は自動収集せず、掲載するものだけをここに書く。
  */
 import Layout from '../../layouts/Layout.astro';
+import ArticleCardList from '../../components/ArticleCardList.astro';
 import { SITE_NAME } from '../../consts';
 
 const CATEGORY_NAME = 'サプリメント';
@@ -40,12 +41,5 @@ const articles = [
 
   <p>{CATEGORY_DESCRIPTION}</p>
 
-  <ul>
-    {articles.map((article) => (
-      <li>
-        <a href={article.href}>{article.title}</a>
-        <p>{article.description}</p>
-      </li>
-    ))}
-  </ul>
+  <ArticleCardList items={articles} />
 </Layout>

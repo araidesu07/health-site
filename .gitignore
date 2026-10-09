@@ -22,3 +22,6 @@ pnpm-debug.log*
 
 # jetbrains setting folder
 .idea/
+
+# サムネイル生成の旧出力先・作業用（公開用は public/images/thumbnails/）
+thumbnails/output/

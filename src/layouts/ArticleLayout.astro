@@ -38,7 +38,7 @@ import type { Source } from '../components/SourceList.astro';
 import type { TypeGuideItem } from '../components/TypeGuide.astro';
 import type { CategoryDecisionData } from '../components/CategoryDecision.astro';
 import type { DecisionAxisItem } from '../components/DecisionAxes.astro';
-import { SITE_NAME } from '../consts';
+import { SITE_NAME, thumbnailFor } from '../consts';
 import InlineText from '../components/InlineText.astro';
 
 const { frontmatter } = Astro.props;
@@ -189,9 +189,12 @@ const jsonLd = {
   publisher: { '@type': 'Organization', name: SITE_NAME },
   ...(canonicalURL ? { mainEntityOfPage: canonicalURL } : {}),
 };
+
+/* OGP 画像。consts.ts の ARTICLE_THUMBNAILS に登録した記事だけ */
+const ogImage = thumbnailFor(Astro.url.pathname);
 ---
 
-<Layout title={title} description={description}>
+<Layout title={title} description={description} image={ogImage}>
   <script
     type="application/ld+json"
     is:inline
