@@ -8,6 +8,13 @@ export const SITE_NAME = '薬剤師の成分チェック';
 export const SITE_DESCRIPTION =
   '薬剤師が、市販の健康関連商品を成分と根拠から評価するサイトです。';
 
+/**
+ * 著者トウノの正式アイコン（表示用）。
+ * マスター thumbnails/assets/touno-avatar-master.png（1024px）を 256px に縮小した可逆 WebP。
+ * デザインは変えない。マスターを差し替えたら作り直す
+ */
+export const AUTHOR_AVATAR = '/images/touno-avatar.webp';
+
 /** フッターに並べる固定ページへのリンク */
 export const FOOTER_LINKS = [
   { href: '/about/', label: '運営者情報' },

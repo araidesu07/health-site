@@ -38,7 +38,7 @@ import type { Source } from '../components/SourceList.astro';
 import type { TypeGuideItem } from '../components/TypeGuide.astro';
 import type { CategoryDecisionData } from '../components/CategoryDecision.astro';
 import type { DecisionAxisItem } from '../components/DecisionAxes.astro';
-import { SITE_NAME, thumbnailFor } from '../consts';
+import { SITE_NAME, AUTHOR_AVATAR, thumbnailFor } from '../consts';
 import InlineText from '../components/InlineText.astro';
 
 const { frontmatter } = Astro.props;
@@ -210,17 +210,23 @@ const ogImage = thumbnailFor(Astro.url.pathname);
     )}
 
     <p class="article-meta">
-      <span class="author">{authorLabel}：{author}{authorRole && `（${authorRole}）`}</span>
-      {datePublished && (
-        <span>
-          公開日：<time datetime={datePublished}>{formatJa(datePublished)}</time>
-        </span>
+      {/* トウノの正式アイコン（著者名の左）。名前が隣にあるので alt は空にする */}
+      {author === DEFAULT_AUTHOR && (
+        <img class="article-meta-avatar" src={AUTHOR_AVATAR} alt="" width="56" height="56" />
       )}
-      {showModified && dateModified && (
-        <span>
-          更新日：<time datetime={dateModified}>{formatJa(dateModified)}</time>
-        </span>
-      )}
+      <span class="article-meta-items">
+        <span class="author">{authorLabel}：{author}{authorRole && `（${authorRole}）`}</span>
+        {datePublished && (
+          <span>
+            公開日：<time datetime={datePublished}>{formatJa(datePublished)}</time>
+          </span>
+        )}
+        {showModified && dateModified && (
+          <span>
+            更新日：<time datetime={dateModified}>{formatJa(dateModified)}</time>
+          </span>
+        )}
+      </span>
     </p>
 
     {isV3 ? (

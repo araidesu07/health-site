@@ -384,8 +384,8 @@ a:hover {
    ------------------------------------------------------------- */
 .article-meta {
   display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem 1rem;
+  align-items: center;
+  gap: 0.9rem;
   font-size: 0.9rem;
   color: var(--color-text-muted);
   margin: 0 0 2.5rem;
@@ -393,9 +393,36 @@ a:hover {
   border-bottom: 1px solid var(--color-border);
 }
 
+/* 著者名・公開日・更新日。幅が足りなければアイコンの右で折り返す */
+.article-meta-items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1rem;
+}
+
 .article-meta .author {
   font-weight: 700;
   color: var(--color-text);
+}
+
+/* 著者アイコン（記事 56px・運営者情報 120px）。正式アイコンを円形に表示するだけで、装飾は足さない */
+.article-meta-avatar,
+.profile-avatar {
+  display: block;
+  flex: none;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.article-meta-avatar {
+  width: 56px;
+  height: 56px;
+}
+
+.profile-avatar {
+  width: 120px;
+  height: 120px;
+  margin: 0 0 1rem;
 }
 
 /* -------------------------------------------------------------
