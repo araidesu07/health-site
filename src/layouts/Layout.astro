@@ -13,25 +13,28 @@
  * 呼び出し側から slot="head" で差し込む。
  */
 import '../styles/global.css';
-import { SITE_NAME, FOOTER_LINKS, THUMBNAIL_SIZE, isNoindexPath } from '../consts';
+import { SITE_NAME, FOOTER_LINKS, SITE_OGP_IMAGE, THUMBNAIL_SIZE, isNoindexPath } from '../consts';
 
 interface Props {
   /** <title> と検索結果に出る見出し */
   title: string;
   /** meta description。省略可 */
   description?: string;
-  /** OGP 画像（サイト内パス）。指定したページだけ OGP / Twitter Card を出す */
+  /** OGP 画像（サイト内パス）。省略時はサイト共通の OGP 画像 */
   image?: string;
+  /** og:type。記事は ArticleLayout が "article" を渡す。それ以外は "website" */
+  ogType?: 'website' | 'article';
 }
 
-const { title, description, image } = Astro.props;
+const { title, description, image, ogType = 'website' } = Astro.props;
 
 const canonicalURL = Astro.site
   ? new URL(Astro.url.pathname, Astro.site).href
   : undefined;
 
-/* SNS は相対URLを解釈しないため、画像は絶対URLにする */
-const imageURL = image && Astro.site ? new URL(image, Astro.site).href : undefined;
+/* SNS は相対URLを解釈しないため、画像は絶対URLにする。
+   記事専用の画像があればそれを、無ければサイト共通の画像を使う（どちらも 1200×630） */
+const imageURL = Astro.site ? new URL(image ?? SITE_OGP_IMAGE, Astro.site).href : undefined;
 
 /* 試作・プレビューは検索に載せない（対象は consts.ts の isNoindexPath） */
 const noindex = isNoindexPath(Astro.url.pathname);
@@ -54,7 +57,7 @@ const year = new Date().getFullYear();
 
     {imageURL && (
       <>
-        <meta property="og:type" content="article" />
+        <meta property="og:type" content={ogType} />
         <meta property="og:site_name" content={SITE_NAME} />
         <meta property="og:title" content={title} />
         {description && <meta property="og:description" content={description} />}

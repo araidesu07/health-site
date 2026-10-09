@@ -190,11 +190,11 @@ const jsonLd = {
   ...(canonicalURL ? { mainEntityOfPage: canonicalURL } : {}),
 };
 
-/* OGP 画像。consts.ts の ARTICLE_THUMBNAILS に登録した記事だけ */
+/* OGP 画像。consts.ts の ARTICLE_THUMBNAILS に登録した記事は専用画像、未登録ならサイト共通画像（Layout 側） */
 const ogImage = thumbnailFor(Astro.url.pathname);
 ---
 
-<Layout title={title} description={description} image={ogImage}>
+<Layout title={title} description={description} image={ogImage} ogType="article">
   <script
     type="application/ld+json"
     is:inline

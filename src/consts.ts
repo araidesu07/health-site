@@ -39,7 +39,13 @@ export function isNoindexPath(pathname: string): boolean {
   return NOINDEX_PATH_PREFIXES.some((prefix) => path.startsWith(prefix));
 }
 
-/** 記事サムネイルの大きさ（thumbnails/generate.mjs の出力と同じ） */
+/**
+ * サイト共通の OGP 画像（ホーム・カテゴリ・固定ページ）。記事は ARTICLE_THUMBNAILS の画像を使う。
+ * デザイン見本の人物部分を正式アイコン（thumbnails/assets/touno-avatar-master.png）に差し替えたもの。1200×630
+ */
+export const SITE_OGP_IMAGE = '/images/site-ogp.png';
+
+/** 記事サムネイルの大きさ（thumbnails/generate.mjs の出力と同じ。サイト共通 OGP 画像も同じ大きさ） */
 export const THUMBNAIL_SIZE = { width: 1200, height: 630 };
 
 /**
